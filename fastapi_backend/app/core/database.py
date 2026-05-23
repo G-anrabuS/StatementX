@@ -1,6 +1,7 @@
 import json
 import uuid
-from sqlalchemy import create_engine
+import difflib
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.types import TypeDecorator, CHAR, TEXT
 from sqlalchemy.dialects.postgresql import UUID as pgUUID, JSONB as pgJSONB
@@ -17,6 +18,19 @@ engine = create_engine(
     echo=True,  # optional, shows SQL queries in terminal
     connect_args=connect_args,
 )
+
+
+def sqlite_similarity(a, b):
+    if a is None or b is None:
+        return 0.0
+    return difflib.SequenceMatcher(None, str(a), str(b)).ratio()
+
+
+@event.listens_for(engine, "connect")
+def setup_sqlite_connection(dbapi_connection, connection_record):
+    if settings.DATABASE_URL.startswith("sqlite"):
+        dbapi_connection.create_function("similarity", 2, sqlite_similarity)
+
 
 SessionLocal = sessionmaker(
     autocommit=False,
