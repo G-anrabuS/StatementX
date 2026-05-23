@@ -61,7 +61,7 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Widget buildTransactionCard(Transaction txn) {
-    return Card(
+      return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -78,6 +78,7 @@ class _UploadScreenState extends State<UploadScreen> {
             Text('Debit: ₹${txn.debit.toStringAsFixed(2)}'),
             Text('Credit: ₹${txn.credit.toStringAsFixed(2)}'),
             Text('Balance: ₹${txn.balance.toStringAsFixed(2)}'),
+            
           ],
         ),
       ),
@@ -145,26 +146,117 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('StatementX.AI')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            ElevatedButton(
-              onPressed: isLoading ? null : pickAndUploadPdf,
-              child: const Text('Upload PDF Statement'),
-            ),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: const Color.fromARGB(255, 171, 174, 244),
 
-            buildErrorView(),
-
-            if (isLoading) buildLoadingView(),
-
-            if (!isLoading && statementData != null) buildResultView(),
-          ],
+    appBar: AppBar(
+      backgroundColor: const Color.fromARGB(255, 171, 174, 244),
+      elevation: 0,
+      centerTitle: true,
+      title: const Text(
+        'StatementX.AI',
+        style: TextStyle(
+          color: Colors.black87,
+          fontWeight: FontWeight.bold,
         ),
       ),
-    );
-  }
+    ),
+
+    body: Center(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black,
+                      blurRadius: 15,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+
+                child: Column(
+                  children: [
+                    const Text(
+                      'Upload Your Bank Statement',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    const Text(
+                      'Upload a PDF statement and analyze your transactions instantly',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey,
+                        height: 1.5,
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    SizedBox(
+                      width: 230,
+                      height: 55,
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            isLoading ? null : pickAndUploadPdf,
+
+                        icon: const Icon(Icons.upload_file_rounded),
+
+                        label: const Text(
+                          'Upload PDF',
+                          style: TextStyle(fontSize: 16),
+                        ),
+
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color.fromARGB(255, 101, 93, 239),
+                          foregroundColor: Colors.white,
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    buildErrorView(),
+
+                    if (isLoading) ...[
+                      const SizedBox(height: 20),
+                      buildLoadingView(),
+                    ],
+
+                    if (!isLoading && statementData != null) ...[
+                      const SizedBox(height: 20),
+                      buildResultView(),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
 }
