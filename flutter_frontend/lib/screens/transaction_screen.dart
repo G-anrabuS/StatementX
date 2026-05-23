@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../models/statement_model.dart';
 
 class TransactionsScreen extends StatelessWidget {
@@ -13,44 +12,43 @@ class TransactionsScreen extends StatelessWidget {
   Color getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'food':
-        return Colors.orange;
+        return const Color(0xFFF97316);
 
       case 'shopping':
-        return Colors.pinkAccent;
+        return const Color(0xFF8B5CF6);
 
       case 'travel':
-        return Colors.blueAccent;
+        return const Color(0xFF3B82F6);
 
       case 'income':
-        return Colors.green;
+        return const Color(0xFF10B981);
 
       default:
-        return Colors.purpleAccent;
+        return const Color(0xFF6366F1);
     }
   }
 
   IconData getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
       case 'food':
-        return Icons.restaurant;
+        return Icons.restaurant_rounded;
 
       case 'shopping':
-        return Icons.shopping_bag_rounded;
+        return Icons.shopping_cart_rounded;
 
       case 'travel':
-        return Icons.directions_car;
+        return Icons.directions_car_rounded;
 
       case 'income':
-        return Icons.account_balance_wallet;
+        return Icons.account_balance_rounded;
 
       default:
-        return Icons.category_rounded;
+        return Icons.widgets_rounded;
     }
   }
 
   Widget buildTransactionCard(Transaction txn) {
-    final category =
-        txn.category ?? 'Others';
+    final category = txn.category ?? 'Others';
 
     final categoryColor =
         getCategoryColor(category);
@@ -59,43 +57,61 @@ class TransactionsScreen extends StatelessWidget {
         getCategoryIcon(category);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 18),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 14),
+
+      padding: const EdgeInsets.symmetric(
+        horizontal: 18,
+        vertical: 16,
+      ),
 
       decoration: BoxDecoration(
-        color: const Color(0xff12052E),
+        color: Colors.white,
+
         borderRadius:
-            BorderRadius.circular(22),
+            BorderRadius.circular(20),
 
         border: Border.all(
-          color:
-              Colors.deepPurple.withOpacity(0.25),
+          color: const Color(0xFFE9ECF2),
         ),
+
+        boxShadow: [
+          BoxShadow(
+            color:
+                Colors.black.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
 
       child: Row(
         children: [
+          // CATEGORY ICON
           Container(
-            width: 58,
-            height: 58,
+            width: 54,
+            height: 54,
 
             decoration: BoxDecoration(
               color:
-                  categoryColor.withOpacity(0.15),
+                  categoryColor.withOpacity(0.1),
+
               borderRadius:
-                  BorderRadius.circular(18),
+                  BorderRadius.circular(14),
             ),
 
             child: Icon(
               categoryIcon,
               color: categoryColor,
-              size: 28,
+              size: 24,
             ),
           ),
 
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
 
-          Expanded(
+          // LEFT SECTION
+          Flexible(
+            flex: 4,
+
             child: Column(
               crossAxisAlignment:
                   CrossAxisAlignment.start,
@@ -103,56 +119,47 @@ class TransactionsScreen extends StatelessWidget {
               children: [
                 Text(
                   txn.narration,
+
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+
+                  overflow:
+                      TextOverflow.ellipsis,
 
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF111827),
                     fontWeight:
-                        FontWeight.bold,
+                        FontWeight.w600,
                     fontSize: 15,
                   ),
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 5),
 
-                Row(
+                // CATEGORY + DATE
+                Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+
                   children: [
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
+                    Text(
+                      txn.category ?? 'Others',
 
-                      decoration: BoxDecoration(
-                        color: categoryColor
-                            .withOpacity(0.15),
-
-                        borderRadius:
-                            BorderRadius.circular(
-                                30),
-                      ),
-
-                      child: Text(
-                        category,
-                        style: TextStyle(
-                          color: categoryColor,
-                          fontWeight:
-                              FontWeight.bold,
-                          fontSize: 12,
-                        ),
+                      style: const TextStyle(
+                        color:
+                            Color(0xFF64748B),
+                        fontSize: 13,
                       ),
                     ),
 
-                    const SizedBox(width: 10),
+                    const SizedBox(height: 4),
 
                     Text(
                       txn.date,
-                      style: TextStyle(
-                        color: Colors.white
-                            .withOpacity(0.65),
-                        fontSize: 13,
+
+                      style: const TextStyle(
+                        color:
+                            Color(0xFF94A3B8),
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -161,39 +168,53 @@ class TransactionsScreen extends StatelessWidget {
             ),
           ),
 
-          Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.end,
+          const SizedBox(width: 10),
 
-            children: [
-              Text(
-                txn.debit > 0
-                    ? '-₹${txn.debit.toStringAsFixed(0)}'
-                    : '+₹${txn.credit.toStringAsFixed(0)}',
+          // RIGHT SECTION
+         const Spacer(),
 
-                style: TextStyle(
-                  color: txn.debit > 0
-                      ? Colors.redAccent
-                      : Colors.greenAccent,
-                  fontWeight:
-                      FontWeight.bold,
-                  fontSize: 17,
-                ),
-              ),
+const Spacer(),
 
-              const SizedBox(height: 6),
+SizedBox(
+  width: 120,
 
-              Text(
-                'Balance ₹${txn.balance.toStringAsFixed(0)}',
+  child: Column(
+    crossAxisAlignment:
+        CrossAxisAlignment.start,
 
-                style: TextStyle(
-                  color: Colors.white
-                      .withOpacity(0.55),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
+    children: [
+    Text(
+      txn.debit > 0
+          ? '- ₹${txn.debit.toStringAsFixed(0)}'
+          : '+ ₹${txn.credit.toStringAsFixed(0)}',
+
+      style: TextStyle(
+        color: txn.debit > 0
+            ? const Color(0xFFEF4444)
+            : const Color(0xFF10B981),
+
+        fontWeight: FontWeight.bold,
+        fontSize: 16,
+      ),
+    ),
+
+    const SizedBox(height: 5),
+
+    Text(
+      'Balance\n₹${txn.balance.toStringAsFixed(0)}',
+
+      textAlign: TextAlign.start,
+
+      style: const TextStyle(
+        color: Color(0xFF64748B),
+        fontSize: 12,
+        height: 1.4,
+      ),
+    ),
+  ],
+),
+
+),
         ],
       ),
     );
@@ -201,59 +222,148 @@ class TransactionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile =
+        MediaQuery.of(context).size.width <
+            800;
+
     return Scaffold(
       backgroundColor:
-          const Color(0xff070014),
+          const Color(0xffF5F7FB),
 
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
+
         elevation: 0,
 
-        centerTitle: true,
+        scrolledUnderElevation: 0,
+
+        iconTheme: const IconThemeData(
+          color: Color(0xFF111827),
+        ),
 
         title: const Text(
           'Transactions',
+
           style: TextStyle(
-            color: Colors.white,
+            color: Color(0xFF111827),
             fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+
+        centerTitle: true,
+
+        bottom: PreferredSize(
+          preferredSize:
+              const Size.fromHeight(1),
+
+          child: Container(
+            height: 1,
+            color:
+                const Color(0xFFE9ECF2),
           ),
         ),
       ),
 
-      body: Padding(
-        padding: const EdgeInsets.all(22),
+      body: Center(
+        child: ConstrainedBox(
+          constraints:
+              const BoxConstraints(
+            maxWidth: 1100,
+          ),
 
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          child: Padding(
+            padding:
+                EdgeInsets.symmetric(
+              horizontal:
+                  isMobile ? 16 : 28,
 
-          children: [
-            Text(
-              '${transactions.length} Transactions',
-
-              style: TextStyle(
-                color:
-                    Colors.white.withOpacity(0.7),
-                fontSize: 15,
-              ),
+              vertical:
+                  isMobile ? 18 : 24,
             ),
 
-            const SizedBox(height: 24),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
 
-            Expanded(
-              child: ListView.builder(
-                itemCount: transactions.length,
+              children: [
+                Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment
+                          .spaceBetween,
 
-                itemBuilder: (context, index) {
-                  return buildTransactionCard(
-                    transactions[index],
-                  );
-                },
-              ),
+                  children: [
+                    Text(
+                      '${transactions.length} Transactions',
+
+                      style:
+                          const TextStyle(
+                        color:
+                            Color(0xFF64748B),
+
+                        fontSize: 15,
+
+                        fontWeight:
+                            FontWeight.w500,
+                      ),
+                    ),
+
+                    Container(
+                      padding:
+                          const EdgeInsets.all(
+                              10),
+
+                      decoration:
+                          BoxDecoration(
+                        color: Colors.white,
+
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                                    12),
+
+                        border: Border.all(
+                          color:
+                              const Color(
+                            0xFFE9ECF2,
+                          ),
+                        ),
+                      ),
+
+                      child: const Icon(
+                        Icons
+                            .filter_list_rounded,
+
+                        size: 20,
+
+                        color: Color(
+                            0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                Expanded(
+                  child: ListView.builder(
+                    itemCount:
+                        transactions.length,
+
+                    itemBuilder:
+                        (context, index) {
+                      return buildTransactionCard(
+                        transactions[index],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
+
