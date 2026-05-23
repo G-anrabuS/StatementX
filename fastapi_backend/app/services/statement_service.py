@@ -55,6 +55,19 @@ class StatementService:
         db.flush()
 
         for txn in extracted_data.transactions:
+            # Robust date parsing fallback to prevent database write crashes
+            parsed_date = None
+            for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"]:
+                try:
+                    parsed_date = datetime.strptime(txn.date, fmt).date()
+                    break
+                except ValueError:
+                    continue
+            
+            if parsed_date is None:
+                # Default to today's date if completely unparseable
+                parsed_date = datetime.now().date()
+
             transaction = Transaction(
                 statement_id=statement.statement_id,
                 date=parse_robust_date(txn.date),

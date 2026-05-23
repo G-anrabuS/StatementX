@@ -31,3 +31,5 @@ uvicorn==0.28.0
 websockets==14.2
 transformers>=4.30.0
 torch>=2.0.0
+polars==1.41.0
+pypdf==6.5.0

@@ -1,7 +1,7 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, JSON
+from sqlalchemy import Column, String, DateTime
 from sqlalchemy.sql import func
-from app.core.database import Base, GUID
+from app.core.database import Base, GUID, JSONB
 
 
 class Statement(Base):
@@ -29,6 +29,7 @@ class Statement(Base):
     )
 
     raw_ai_output = Column(
-        JSON,
+        JSONB,
         nullable=False,
     )
+

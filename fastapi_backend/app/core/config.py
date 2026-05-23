@@ -21,9 +21,8 @@ class Settings:
             )
 
         if not self.DATABASE_URL:
-            raise ValueError(
-                "[ERROR] System Configuration Error: DATABASE_URL is missing from .env file!"
-            )
+            print("WARNING: DATABASE_URL is missing from .env file. Falling back to local SQLite database: 'sqlite:///./statementx.db'")
+            self.DATABASE_URL = "sqlite:///./statementx.db"
 
         # Resilient SQLite CWD Absolute Path Resolution
         if self.DATABASE_URL.startswith("sqlite:///./"):
