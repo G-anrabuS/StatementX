@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/insights_model.dart';
+import '../theme/app_theme.dart';
 
 class InsightsScreen extends StatefulWidget {
   final String bankName;
@@ -21,19 +22,19 @@ class _InsightsScreenState extends State<InsightsScreen> {
   Color getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'food':
-        return const Color(0xFFF97316);
+        return const Color(0xFFE65100);
       case 'shopping':
-        return const Color(0xFF8B5CF6);
+        return const Color(0xFF6A1B9A);
       case 'travel':
-        return const Color(0xFF3B82F6);
+        return const Color(0xFF1565C0);
       case 'income':
-        return const Color(0xFF10B981);
+        return AppColors.primaryGreen;
       case 'utilities':
-        return const Color(0xFFEC4899);
+        return const Color(0xFFC2185B);
       case 'entertainment':
-        return const Color(0xFF06B6D4);
+        return const Color(0xFF00838F);
       default:
-        return const Color(0xFF6366F1);
+        return AppColors.secondaryTeal;
     }
   }
 
@@ -43,28 +44,25 @@ class _InsightsScreenState extends State<InsightsScreen> {
     required IconData icon,
     required Color color,
     required String subtext,
-    required bool isMobile, // Added parameter to handle responsiveness
+    required bool isMobile,
   }) {
     return Container(
-      padding: EdgeInsets.all(
-        isMobile ? 12 : 20,
-      ), // Responsive internal padding
+      padding: EdgeInsets.all(isMobile ? 12 : 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE9ECF2)),
+        border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment:
-            MainAxisAlignment.spaceBetween, // Distribute content evenly
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -75,44 +73,31 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: const Color(0xFF64748B),
+                    color: AppColors.textSecondary,
                     fontSize: isMobile ? 12 : 13,
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: isMobile ? 16 : 18),
-              ),
+              Icon(icon, color: color, size: isMobile ? 16 : 18),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           FittedBox(
-            // Ensures text auto-scales instead of forcing layouts outward
             fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
             child: Text(
               value,
               style: TextStyle(
-                color: const Color(0xFF111827),
-                fontSize: isMobile
-                    ? 22
-                    : 28, // Scaled down text size for mobile views
+                color: AppColors.textPrimary,
+                fontSize: isMobile ? 20 : 26,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             subtext,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+            style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
           ),
         ],
       ),
@@ -124,14 +109,14 @@ class _InsightsScreenState extends State<InsightsScreen> {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE9ECF2)),
+          border: Border.all(color: AppColors.borderLight),
         ),
         child: const Center(
           child: Text(
             'No spending data available',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
         ),
       );
@@ -144,13 +129,13 @@ class _InsightsScreenState extends State<InsightsScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE9ECF2)),
+        border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
@@ -161,7 +146,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
           const Text(
             'Spending Breakdown',
             style: TextStyle(
-              color: Color(0xFF111827),
+              color: AppColors.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -183,14 +168,12 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Text(
-                          category,
-                          style: const TextStyle(
-                            color: Color(0xFF111827),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
+                      Text(
+                        category,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       Text(
@@ -207,44 +190,42 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      minHeight: 8,
+                      minHeight: 6,
                       value: total / 100,
-                      backgroundColor: const Color(0xFFE5E7EB),
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                      backgroundColor: AppColors.bgLight,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        color.withOpacity(0.85),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${total.toStringAsFixed(1)}% of total expenses',
+                    '${total.toStringAsFixed(1)}% of expenses',
                     style: const TextStyle(
-                      color: Color(0xFF94A3B8),
+                      color: AppColors.textTertiary,
                       fontSize: 11,
                     ),
                   ),
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
   }
 
   Widget _buildSubscriptions() {
-    if (widget.insights.subscriptions.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE9ECF2)),
+        border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
@@ -255,94 +236,83 @@ class _InsightsScreenState extends State<InsightsScreen> {
           const Text(
             'Recurring Subscriptions',
             style: TextStyle(
-              color: Color(0xFF111827),
+              color: AppColors.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 20),
           ...widget.insights.subscriptions.map((sub) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FB),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE9ECF2)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sub.vendor,
-                            style: const TextStyle(
-                              color: Color(0xFF111827),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            sub.frequency,
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.bgLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        sub.vendor,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '₹${sub.averageAmount.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Color(0xFF111827),
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      Text(
+                        sub.frequency,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          sub.lastTransactionDate,
-                          style: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 11,
-                          ),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹${sub.averageAmount.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: AppColors.primaryGreen,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      Text(
+                        sub.lastTransactionDate,
+                        style: const TextStyle(
+                          color: AppColors.textTertiary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
   }
 
   Widget _buildAnomalies() {
-    if (widget.insights.anomalies.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE9ECF2)),
+        border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
@@ -353,100 +323,84 @@ class _InsightsScreenState extends State<InsightsScreen> {
           const Text(
             'Anomalies Detected',
             style: TextStyle(
-              color: Color(0xFF111827),
+              color: AppColors.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 20),
-          ...widget.insights.anomalies.take(5).map((anomaly) {
+          ...widget.insights.anomalies.take(4).map((anomaly) {
             final color = anomaly.type.toLowerCase() == 'high_value'
-                ? const Color(0xFFEF4444)
-                : anomaly.type.toLowerCase() == 'duplicate'
-                ? const Color(0xFFF59E0B)
-                : const Color(0xFF3B82F6);
+                ? const Color(0xFFC62828)
+                : const Color(0xFFE65100);
 
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withOpacity(0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            anomaly.narration,
-                            style: const TextStyle(
-                              color: Color(0xFF111827),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            anomaly.type.replaceAll('_', ' '),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      anomaly.reason,
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Text(
-                          anomaly.date,
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: color.withOpacity(0.15)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          anomaly.narration,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Text(
-                          '₹${anomaly.amount.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            color: color,
-                            fontSize: 12,
+                            color: AppColors.textPrimary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ],
+                      ),
+                      Text(
+                        anomaly.type.replaceAll('_', ' '),
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    anomaly.reason,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        anomaly.date,
+                        style: const TextStyle(
+                          color: AppColors.textTertiary,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        '₹${anomaly.amount.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -457,113 +411,101 @@ class _InsightsScreenState extends State<InsightsScreen> {
     final isMobile = MediaQuery.of(context).size.width < 800;
 
     return Scaffold(
-      backgroundColor: const Color(0xffF5F7FB),
+      backgroundColor: AppColors.bgLight,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surfaceLight,
         elevation: 0,
-        scrolledUnderElevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF111827)),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         title: const Text(
           'Insights',
           style: TextStyle(
-            color: Color(0xFF111827),
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
           ),
         ),
         centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: const Color(0xFFE9ECF2)),
-        ),
       ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 28,
-              vertical: isMobile ? 18 : 24,
+              horizontal: isMobile ? 12 : 28,
+              vertical: 24,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${widget.bankName} Statement Analysis',
+                  '${widget.bankName} Analysis',
                   style: const TextStyle(
-                    color: Color(0xFF111827),
+                    color: AppColors.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   '${widget.totalTransactions} transactions analyzed',
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: AppColors.textSecondary),
                 ),
-                const SizedBox(height: 32),
-                // Summary Cards
+                const SizedBox(height: 24),
                 GridView.count(
                   crossAxisCount: isMobile ? 2 : 4,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  // Dynamically expand vertical cell ratio on phone dimensions to match text scales
-                  childAspectRatio: isMobile ? 1.25 : 1.0,
+                  childAspectRatio: isMobile ? 1.35 : 1.1,
                   children: [
                     _buildStatCard(
                       label: 'Total Income',
                       value:
                           '₹${widget.insights.totalIncome.toStringAsFixed(0)}',
-                      icon: Icons.trending_up_rounded,
-                      color: const Color(0xFF10B981),
-                      subtext: 'All credits',
+                      icon: Icons.arrow_upward,
+                      color: AppColors.primaryGreen,
+                      subtext: 'Credits',
                       isMobile: isMobile,
                     ),
                     _buildStatCard(
                       label: 'Total Expense',
                       value:
                           '₹${widget.insights.totalExpense.toStringAsFixed(0)}',
-                      icon: Icons.trending_down_rounded,
-                      color: const Color(0xFFEF4444),
-                      subtext: 'All debits',
+                      icon: Icons.arrow_downward,
+                      color: const Color(0xFFC62828),
+                      subtext: 'Debits',
                       isMobile: isMobile,
                     ),
                     _buildStatCard(
                       label: 'Net Savings',
                       value:
                           '₹${widget.insights.netSavings.toStringAsFixed(0)}',
-                      icon: Icons.savings_rounded,
-                      color: const Color(0xFF6D5DFB),
-                      subtext: 'Income - Expenses',
+                      icon: Icons.wallet_rounded,
+                      color: AppColors.secondaryTeal,
+                      subtext: 'Saved',
                       isMobile: isMobile,
                     ),
                     _buildStatCard(
                       label: 'Saving Rate',
                       value:
                           '${(widget.insights.savingRate * 100).toStringAsFixed(1)}%',
-                      icon: Icons.percent_rounded,
-                      color: const Color(0xFF3B82F6),
-                      subtext: 'Percentage saved',
+                      icon: Icons.pie_chart,
+                      color: const Color(0xFF6A1B9A),
+                      subtext: 'Ratio',
                       isMobile: isMobile,
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
-                // Category Breakdown
+                const SizedBox(height: 24),
                 _buildCategoryBreakdown(),
-                const SizedBox(height: 32),
-                // Subscriptions
-                if (widget.insights.subscriptions.isNotEmpty)
+                if (widget.insights.subscriptions.isNotEmpty) ...[
+                  const SizedBox(height: 24),
                   _buildSubscriptions(),
-                if (widget.insights.subscriptions.isNotEmpty)
-                  const SizedBox(height: 32),
-                // Anomalies
-                if (widget.insights.anomalies.isNotEmpty) _buildAnomalies(),
+                ],
+                if (widget.insights.anomalies.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildAnomalies(),
+                ],
               ],
             ),
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/statement_model.dart';
 import '../services/statement_service.dart';
+import '../theme/app_theme.dart';
 import 'insights_screen.dart';
 
 class TransactionsScreen extends StatefulWidget {
@@ -25,49 +26,33 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Color getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'food':
-        return const Color(0xFFF97316);
+        return const Color(0xFFE65100); // Rich safety orange
       case 'shopping':
-        return const Color(0xFF8B5CF6);
+        return const Color(0xFF6A1B9A); // Royal amethyst purple
       case 'travel':
-        return const Color(0xFF3B82F6);
+        return const Color(0xFF1565C0); // Tech cobalt blue
       case 'income':
-        return const Color(0xFF10B981);
+        return AppColors.primaryGreen; // Financial emerald green
       default:
-        return const Color(0xFF6366F1);
-    }
-  }
-
-  IconData getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-        return Icons.restaurant_rounded;
-      case 'shopping':
-        return Icons.shopping_cart_rounded;
-      case 'travel':
-        return Icons.directions_car_rounded;
-      case 'income':
-        return Icons.account_balance_rounded;
-      default:
-        return Icons.widgets_rounded;
+        return AppColors.secondaryTeal; // Corporate steel teal
     }
   }
 
   Widget buildTransactionCard(Transaction txn) {
     final category = txn.category ?? 'Others';
-    final categoryColor = getCategoryColor(category);
-    final categoryIcon = getCategoryIcon(category);
+    final indicatorColor = getCategoryColor(category);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE9ECF2)),
+        border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
@@ -75,17 +60,16 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       child: Row(
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: 4,
+            height: 38,
             decoration: BoxDecoration(
-              color: categoryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
+              color: indicatorColor,
+              borderRadius: BorderRadius.circular(2),
             ),
-            child: Icon(categoryIcon, color: categoryColor, size: 24),
           ),
-          const SizedBox(width: 14),
-          Flexible(
-            flex: 5,
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 6,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -94,62 +78,75 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF111827),
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
                   ),
                 ),
                 const SizedBox(height: 5),
-                Text(
-                  category,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  txn.date,
-                  style: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 12,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: indicatorColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 3,
+                      height: 3,
+                      decoration: const BoxDecoration(
+                        color: AppColors.textTertiary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      txn.date,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const Spacer(), // Pushes amount block completely rightward
-          SizedBox(
-            width:
-                140, // Expanded slightly for safe web rendering without text clipping
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 4,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment
-                  .end, // FIXED: Force right alignment inside Column
+              crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   txn.debit > 0
                       ? '- ₹${txn.debit.toStringAsFixed(0)}'
                       : '+ ₹${txn.credit.toStringAsFixed(0)}',
-                  textAlign: TextAlign
-                      .right, // FIXED: Force right text alignment rule on Web
+                  textAlign: TextAlign.right,
                   style: TextStyle(
                     color: txn.debit > 0
-                        ? const Color(0xFFEF4444)
-                        : const Color(0xFF10B981),
+                        ? const Color(0xFFD32F2F)
+                        : AppColors.primaryGreen,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 15,
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 4),
                 Text(
-                  'Balance: ₹${txn.balance.toStringAsFixed(0)}',
-                  textAlign: TextAlign
-                      .right, // FIXED: Force right text alignment rule on Web
+                  'Bal: ₹${txn.balance.toStringAsFixed(0)}',
+                  textAlign: TextAlign.right,
                   style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 12,
-                    height: 1.4,
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -161,18 +158,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   void _loadInsights() async {
-    if (widget.statementId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to load insights')),
-        );
-      }
-      return;
-    }
-
-    setState(() {
-      isLoadingInsights = true;
-    });
+    if (widget.statementId == null) return;
+    setState(() => isLoadingInsights = true);
 
     try {
       final insights = await StatementService.getStatementInsights(
@@ -197,11 +184,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoadingInsights = false;
-        });
-      }
+      if (mounted) setState(() => isLoadingInsights = false);
     }
   }
 
@@ -210,16 +193,16 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     final isMobile = MediaQuery.of(context).size.width < 800;
 
     return Scaffold(
-      backgroundColor: const Color(0xffF5F7FB),
+      backgroundColor: AppColors.bgLight,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surfaceLight,
         elevation: 0,
         scrolledUnderElevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF111827)),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         title: const Text(
           'Transactions',
           style: TextStyle(
-            color: Color(0xFF111827),
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
@@ -227,7 +210,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: const Color(0xFFE9ECF2)),
+          child: Container(height: 1, color: AppColors.borderLight),
         ),
       ),
       body: Center(
@@ -235,11 +218,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           constraints: const BoxConstraints(maxWidth: 1100),
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 28,
-              vertical: isMobile ? 18 : 24,
+              horizontal: isMobile ? 12 : 28,
+              vertical: 24,
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -247,80 +229,60 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     Text(
                       '${widget.transactions.length} Transactions',
                       style: const TextStyle(
-                        color: Color(0xFF64748B),
+                        color: AppColors.textSecondary,
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: isLoadingInsights ? null : _loadInsights,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppColors.primaryGreen,
+                                AppColors.secondaryTeal,
+                              ],
+                            ),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE9ECF2)),
                           ),
-                          child: const Icon(
-                            Icons.filter_list_rounded,
-                            size: 20,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: isLoadingInsights ? null : _loadInsights,
-                            borderRadius: BorderRadius.circular(12),
-                            child: Ink(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xff6D5DFB),
-                                    Color(0xff7C4DFF),
+                          child: isLoadingInsights
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.insights_rounded,
+                                      size: 18,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Insights',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ],
                                 ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: isLoadingInsights
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              Colors.white,
-                                            ),
-                                      ),
-                                    )
-                                  : const Row(
-                                      children: [
-                                        Icon(
-                                          Icons.insights_rounded,
-                                          size: 18,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'Insights',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                            ),
-                          ),
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -328,9 +290,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 Expanded(
                   child: ListView.builder(
                     itemCount: widget.transactions.length,
-                    itemBuilder: (context, index) {
-                      return buildTransactionCard(widget.transactions[index]);
-                    },
+                    itemBuilder: (context, index) =>
+                        buildTransactionCard(widget.transactions[index]),
                   ),
                 ),
               ],
