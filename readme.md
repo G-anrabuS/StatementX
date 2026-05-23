@@ -29,8 +29,6 @@ StatementX/
 
 ---
 
----
-
 🚀 Quick Start (Local Setup)
 
 1. Backend Setup
