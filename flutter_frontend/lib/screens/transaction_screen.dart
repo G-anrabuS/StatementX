@@ -59,6 +59,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       ),
       child: Row(
         children: [
+          // Left accent indicator line
           Container(
             width: 4,
             height: 38,
@@ -68,6 +69,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ),
           const SizedBox(width: 12),
+          // Narrative details block
           Expanded(
             flex: 6,
             child: Column(
@@ -84,21 +86,22 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   ),
                 ),
                 const SizedBox(height: 5),
-                Row(
+                // FIXED: Changed from Row to Wrap to enforce side-by-side alignment on both Web & Android
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing:
+                      6, // Adds uniform space between elements horizontally
+                  runSpacing:
+                      4, // Handles elegant multi-line wrapping safely if text gets too long
                   children: [
-                    Expanded(
-                      child: Text(
-                        category,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: indicatorColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    Text(
+                      category,
+                      style: TextStyle(
+                        color: indicatorColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 6),
                     Container(
                       width: 3,
                       height: 3,
@@ -107,7 +110,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 6),
                     Text(
                       txn.date,
                       style: const TextStyle(
@@ -121,6 +123,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ),
           const SizedBox(width: 8),
+          // Financial values summary block
           Expanded(
             flex: 4,
             child: Column(
@@ -271,7 +274,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                                       size: 18,
                                       color: Colors.white,
                                     ),
-                                    const SizedBox(width: 8),
+                                    SizedBox(width: 8),
                                     Text(
                                       'Insights',
                                       style: TextStyle(
