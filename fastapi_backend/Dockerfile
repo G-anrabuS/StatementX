@@ -20,6 +20,7 @@ COPY requirements.txt .
 
 # Install dependencies into a wheels directory to copy to final stage
 RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir -r requirements.txt gunicorn
 
 # --- Stage 2: Final Runtime Stage ---
