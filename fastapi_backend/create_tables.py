@@ -5,4 +5,4 @@ from app.models.merchant_cache import MerchantCache
 
 Base.metadata.create_all(bind=engine)
 
-print("✅ StatementX tables created.")
+print("[SUCCESS] StatementX tables created.")

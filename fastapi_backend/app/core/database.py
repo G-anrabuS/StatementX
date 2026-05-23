@@ -18,6 +18,21 @@ engine = create_engine(
     connect_args=connect_args,
 )
 
+# SQLite does not support custom text similarity natively.
+# Register a custom 'similarity' function using python's difflib.SequenceMatcher.
+if settings.DATABASE_URL.startswith("sqlite"):
+    from sqlalchemy import event
+    import difflib
+
+    @event.listens_for(engine, "connect")
+    def connect(dbapi_connection, connection_record):
+        def similarity_func(a, b):
+            if not a or not b:
+                return 0.0
+            return difflib.SequenceMatcher(None, str(a), str(b)).ratio()
+        dbapi_connection.create_function("similarity", 2, similarity_func)
+
+
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,

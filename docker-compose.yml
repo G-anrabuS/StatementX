@@ -1,0 +1,129 @@
+version: '3.9'
+
+# ==============================================================================
+# StatementX Multi-Container Production Orchestration Configuration
+# Tech Stack: Postgres 16, FastAPI Backend, Flutter Frontend, Nginx Reverse Proxy
+# ==============================================================================
+
+networks:
+  # Internal network connecting Backend to Database (Database is fully isolated)
+  statementx_net_back:
+    driver: bridge
+    internal: true
+  # Frontend network connecting Nginx to Frontend and Backend endpoints
+  statementx_net_front:
+    driver: bridge
+
+volumes:
+  # Persistent storage volume for PostgreSQL data directory
+  pgdata:
+    driver: local
+  # Persistent storage for downloaded ONNX classifier models (avoids re-download on rebuilds)
+  onnx_model_data:
+    driver: local
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Database Service
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: statementx-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # Expose only on internal network (fully blocked from the host/public web)
+    networks:
+      - statementx_net_back
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-statementx}
+    # Database initialization health checks
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # 2. FastAPI Backend Service (Internal only)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./fastapi_backend
+      dockerfile: Dockerfile
+    container_name: statementx-backend
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # Hooks into database network AND frontend network to act as secure bridge
+    networks:
+      - statementx_net_back
+      - statementx_net_front
+    volumes:
+      - onnx_model_data:/app/onnx_model
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      HF_TOKEN: ${HF_TOKEN}
+      DATABASE_URL: ${DATABASE_URL}
+      PROJECT_NAME: ${PROJECT_NAME:-StatementX AI Core Engine}
+      API_STR: ${API_STR:-/api}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # ----------------------------------------------------------------------------
+  # 3. Flutter Web static asset server
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./flutter_frontend
+      dockerfile: Dockerfile
+    container_name: statementx-frontend
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - statementx_net_front
+    # Exposes 80 internally on statementx_net_front network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------------------------------
+  # 4. Nginx Reverse Proxy Service (Gateway)
+  # ----------------------------------------------------------------------------
+  nginx:
+    image: nginx:stable-alpine
+    container_name: statementx-nginx
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # Connects only to front-facing network to route traffic
+    networks:
+      - statementx_net_front
+    ports:
+      # Bind public HTTP and HTTPS ports to the host system
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Mount Nginx reverse proxy configuration
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # Directory mount mapping for Certbot SSL validations and certificates
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    depends_on:
+      - frontend
+      - backend
