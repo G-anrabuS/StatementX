@@ -1,5 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
+from typing import List
+from app.models.statement import Statement
+from app.schemas.insights import StatementInsightsResponse
+from app.services.insights_service import InsightsService
 
 from app.schemas.statements import (
     StatementExtractionResponse,
@@ -120,16 +124,54 @@ async def extract_statement(
             transactions=enriched_transactions,
         )
 
-        StatementService.save_statement(
+        statement_record = StatementService.save_statement(
             db=db,
             file_name=file.filename,
             extracted_data=extracted_result,
         )
 
+        extracted_result.statement_id = str(statement_record.statement_id)
         return extracted_result
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Core extraction pipeline layer failure: {str(e)}",
+        )
+
+
+@router.get("", response_model=List[dict])
+async def list_statements(db: Session = Depends(get_db)):
+    """
+    Retrieves and lists all uploaded bank statements with their metadata and database IDs.
+    """
+    statements = db.query(Statement).order_by(Statement.uploaded_at.desc()).all()
+    return [
+        {
+            "statement_id": str(s.statement_id),
+            "file_name": s.file_name,
+            "bank_name": s.bank_name,
+            "uploaded_at": s.uploaded_at.isoformat() if s.uploaded_at else None,
+        }
+        for s in statements
+    ]
+
+
+@router.get("/{statement_id}/insights", response_model=StatementInsightsResponse)
+async def get_statement_insights(
+    statement_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves and generates dynamic aggregates, category spending breakdowns,
+    recurring subscription checks, and suspicious transaction anomaly logs
+    for a specific statement ID.
+    """
+    try:
+        insights = InsightsService.generate_statement_insights(db, statement_id)
+        return insights
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Insights engine failure: {str(e)}",
         )

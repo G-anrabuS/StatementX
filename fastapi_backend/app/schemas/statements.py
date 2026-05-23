@@ -71,6 +71,7 @@ class TransactionItem(BaseModel):
 
 
 class StatementExtractionResponse(BaseModel):
+    statement_id: Optional[str] = None
     bank_name: str
     total_transactions: int
     transactions: List[TransactionItem]
