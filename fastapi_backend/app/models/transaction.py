@@ -1,20 +1,19 @@
 import uuid
 from sqlalchemy import Column, String, Date, Numeric, Float, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
-from app.core.database import Base
+from app.core.database import Base, GUID
 
 
 class Transaction(Base):
     __tablename__ = "transactions"
 
     transaction_id = Column(
-        UUID(as_uuid=True),
+        GUID,
         primary_key=True,
         default=uuid.uuid4,
     )
 
     statement_id = Column(
-        UUID(as_uuid=True),
+        GUID,
         ForeignKey("statements.statement_id"),
         nullable=False,
     )
@@ -57,4 +56,22 @@ class Transaction(Base):
     user_override_cat = Column(
         String,
         nullable=True,
+    )
+
+    category = Column(
+        String,
+        nullable=True,
+        default="Unclassified_Miscellaneous",
+    )
+
+    sub_category = Column(
+        String,
+        nullable=True,
+        default="Unknown",
+    )
+
+    confidence = Column(
+        Float,
+        nullable=True,
+        default=0.0,
     )

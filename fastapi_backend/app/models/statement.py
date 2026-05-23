@@ -1,15 +1,14 @@
 import uuid
-from sqlalchemy import Column, String, DateTime
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, DateTime, JSON
 from sqlalchemy.sql import func
-from app.core.database import Base
+from app.core.database import Base, GUID
 
 
 class Statement(Base):
     __tablename__ = "statements"
 
     statement_id = Column(
-        UUID(as_uuid=True),
+        GUID,
         primary_key=True,
         default=uuid.uuid4,
     )
@@ -30,6 +29,6 @@ class Statement(Base):
     )
 
     raw_ai_output = Column(
-        JSONB,
+        JSON,
         nullable=False,
     )

@@ -17,13 +17,20 @@ class Settings:
 
         if not self.GEMINI_API_KEY:
             raise ValueError(
-                "❌ System Configuration Error: GEMINI_API_KEY is missing from .env file!"
+                "[ERROR] System Configuration Error: GEMINI_API_KEY is missing from .env file!"
             )
 
         if not self.DATABASE_URL:
             raise ValueError(
-                "❌ System Configuration Error: DATABASE_URL is missing from .env file!"
+                "[ERROR] System Configuration Error: DATABASE_URL is missing from .env file!"
             )
+
+        # Resilient SQLite CWD Absolute Path Resolution
+        if self.DATABASE_URL.startswith("sqlite:///./"):
+            # Grandparent directory of app/core is fastapi_backend
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            db_file = self.DATABASE_URL.replace("sqlite:///./", "")
+            self.DATABASE_URL = f"sqlite:///{os.path.join(base_dir, db_file)}"
 
 
 settings = Settings()

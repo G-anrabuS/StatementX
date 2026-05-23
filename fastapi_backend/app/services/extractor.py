@@ -1,6 +1,6 @@
 from google import genai
 from google.genai import types
-from app.schemas.statements import StatementExtractionResponse
+from app.schemas.statements import RawStatementExtractionResponse
 
 from app.core.config import settings
 
@@ -11,7 +11,7 @@ class BankExtractorService:
 
     async def execute_semantic_parse(
         self, document_bytes: bytes
-    ) -> StatementExtractionResponse:
+    ) -> RawStatementExtractionResponse:
         document_part = types.Part.from_bytes(
             data=document_bytes, mime_type="application/pdf"
         )
@@ -34,14 +34,14 @@ class BankExtractorService:
 
         # Leverage native JSON-Schema structural constraints to force output matching our exact datatypes
         response = self.client.models.generate_content(
-            model="gemini-3.1-flash-lite",
+            model="gemini-2.5-flash",
             contents=[document_part, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=StatementExtractionResponse,
+                response_schema=RawStatementExtractionResponse,
                 temperature=0.1,  # Low temperature ensures high reliability, non-creative accuracy
             ),
         )
 
         # Hydrate JSON back cleanly directly into validated typing structures
-        return StatementExtractionResponse.model_validate_json(response.text)
+        return RawStatementExtractionResponse.model_validate_json(response.text)

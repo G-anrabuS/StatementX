@@ -1,7 +1,45 @@
-from datetime import datetime
+import re
+import logging
+from datetime import datetime, date
 
 from app.models.statement import Statement
 from app.models.transaction import Transaction
+
+logger = logging.getLogger(__name__)
+
+
+def parse_robust_date(date_str: str) -> date:
+    """Robust parser trying multiple date formats commonly seen in bank statements."""
+    date_str = date_str.strip()
+    
+    # Common formats to try sequentially
+    formats = [
+        "%d/%m/%Y", "%d-%m-%Y", "%d %m %Y",
+        "%d/%m/%y", "%d-%m-%y", "%d %m %y",
+        "%Y-%m-%d", "%Y/%m/%d",
+        "%d %b %Y", "%d-%b-%Y", "%d/%b/%Y",
+        "%d %B %Y", "%d-%B-%Y", "%d/%B/%Y",
+        "%b %d, %Y", "%B %d, %Y",
+        "%d %b, %Y", "%d %B, %Y"
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+            
+    # Try cleaning extra whitespace and tabs
+    cleaned_date = re.sub(r"\s+", " ", date_str).strip()
+    for fmt in formats:
+        try:
+            return datetime.strptime(cleaned_date, fmt).date()
+        except ValueError:
+            continue
+            
+    # If all formats fail, log and fallback to today to prevent pipeline crashes
+    logger.error(f"Failed to parse date string '{date_str}', falling back to today's date.")
+    return datetime.today().date()
 
 
 class StatementService:
@@ -19,11 +57,15 @@ class StatementService:
         for txn in extracted_data.transactions:
             transaction = Transaction(
                 statement_id=statement.statement_id,
-                date=datetime.strptime(txn.date, "%d/%m/%Y").date(),
+                date=parse_robust_date(txn.date),
                 raw_description=txn.narration,
                 debit=txn.debit,
                 credit=txn.credit,
                 balance=txn.balance,
+                # NLP categorization fields
+                category=txn.category,
+                sub_category=txn.sub_category,
+                confidence=txn.confidence,
             )
 
             db.add(transaction)
@@ -32,3 +74,4 @@ class StatementService:
         db.refresh(statement)
 
         return statement
+

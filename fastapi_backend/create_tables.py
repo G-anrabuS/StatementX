@@ -6,4 +6,4 @@ from app.models.transaction import Transaction
 
 Base.metadata.create_all(bind=engine)
 
-print("✅ StatementX database tables created successfully.")
+print("[SUCCESS] StatementX database tables created successfully.")
