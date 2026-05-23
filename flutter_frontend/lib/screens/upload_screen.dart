@@ -17,10 +17,10 @@ class _UploadScreenState extends State<UploadScreen> {
   StatementResponse? statementData;
   String? errorMessage;
 
-  Future<void> pickAndUploadPdf() async {
+  Future<void> pickAndUploadFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf'],
+      allowedExtensions: ['pdf', 'csv'],
       withData: true,
     );
 
@@ -30,7 +30,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
     if (file.bytes == null) {
       setState(() {
-        errorMessage = 'Unable to read selected PDF file.';
+        errorMessage = 'Unable to read selected statement file.';
       });
       return;
     }
@@ -46,11 +46,15 @@ class _UploadScreenState extends State<UploadScreen> {
         file.bytes!,
       );
 
+      if (!mounted) return;
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => TransactionsScreen(
             transactions: response.transactions,
+            bankName: response.bankName,
+            statementId: response.statementId,
           ),
         ),
       );
@@ -65,23 +69,14 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
-  Widget featureCard(
-    IconData icon,
-    String title,
-    String subtitle,
-  ) {
+  Widget featureCard(IconData icon, String title, String subtitle) {
     return Container(
       width: 210,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 18,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: const Color(0xFFE9ECF2),
-        ),
+        border: Border.all(color: const Color(0xFFE9ECF2)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -90,36 +85,18 @@ class _UploadScreenState extends State<UploadScreen> {
           ),
         ],
       ),
-
       child: Row(
         children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor:
-                const Color(0xff6D5DFB).withOpacity(0.1),
-            child: Icon(
-              icon,
-              color: const Color(0xff6D5DFB),
-              size: 22,
-            ),
+            backgroundColor: const Color(0xff6D5DFB).withOpacity(0.1),
+            child: Icon(icon, color: const Color(0xff6D5DFB), size: 22),
           ),
-
           const SizedBox(width: 14),
-
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '',
-                  style: TextStyle(
-                    color: Color(0xFF111827),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-
                 Text(
                   title,
                   style: const TextStyle(
@@ -128,9 +105,7 @@ class _UploadScreenState extends State<UploadScreen> {
                     fontSize: 15,
                   ),
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
                   subtitle,
                   style: const TextStyle(
@@ -148,70 +123,54 @@ class _UploadScreenState extends State<UploadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile =
-        MediaQuery.of(context).size.width < 850;
+    final isMobile = MediaQuery.of(context).size.width < 850;
 
     return Scaffold(
       backgroundColor: const Color(0xffF5F7FB),
-
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 20,
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 20,
             vertical: 16,
           ),
-
           child: Center(
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(maxWidth: 1280),
-
+              constraints: const BoxConstraints(maxWidth: 1280),
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 55,
-                  vertical: 50,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile
+                      ? 24
+                      : 55, // Adjusted mobile spacing rules cleanly
+                  vertical: isMobile ? 32 : 50,
                 ),
-
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius:
-                      BorderRadius.circular(28),
-                  border: Border.all(
-                    color: const Color(0xFFE9ECF2),
-                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: const Color(0xFFE9ECF2)),
                   boxShadow: [
                     BoxShadow(
-                      color:
-                          Colors.black.withOpacity(0.04),
+                      color: Colors.black.withOpacity(0.04),
                       blurRadius: 24,
                       offset: const Offset(0, 10),
                     ),
                   ],
                 ),
-
                 child: isMobile
                     ? Column(
+                        crossAxisAlignment: CrossAxisAlignment
+                            .start, // Left aligned mobile setup cleanly
                         children: [
-                          buildLeftSection(),
+                          buildLeftSection(isMobile),
                           const SizedBox(height: 40),
                           buildIllustration(),
                         ],
                       )
                     : Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Flexible(
-                            flex: 5,
-                            child: buildLeftSection(),
-                          ),
-
+                          Flexible(flex: 5, child: buildLeftSection(isMobile)),
                           const SizedBox(width: 20),
-
-                          Flexible(
-                            flex: 4,
-                            child: buildIllustration(),
-                          ),
+                          Flexible(flex: 4, child: buildIllustration()),
                         ],
                       ),
               ),
@@ -222,206 +181,152 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  Widget buildLeftSection() {
+  Widget buildLeftSection(bool isMobile) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(
+            const Icon(
               Icons.find_in_page_rounded,
               size: 42,
-              color: const Color(0xff6D5DFB),
+              color: Color(0xff6D5DFB),
             ),
-
             const SizedBox(width: 10),
-
             RichText(
               text: const TextSpan(
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 children: [
                   TextSpan(
                     text: 'Statement',
-                    style: TextStyle(
-                      color: Color(0xFF111827),
-                    ),
+                    style: TextStyle(color: Color(0xFF111827)),
                   ),
                   TextSpan(
                     text: 'X',
-                    style: TextStyle(
-                      color: Color(0xff6D5DFB),
-                    ),
+                    style: TextStyle(color: Color(0xff6D5DFB)),
                   ),
                 ],
               ),
             ),
           ],
         ),
-
-        const SizedBox(height: 50),
-
-        const Text(
+        SizedBox(height: isMobile ? 30 : 50),
+        Text(
           'BANK',
           style: TextStyle(
-            fontSize: 62,
-            color: Color(0xFF0F172A),
+            fontSize: isMobile
+                ? 38
+                : 62, // FIXED: Scaled size smoothly based on screen dimension targets
+            color: const Color(0xFF0F172A),
             fontWeight: FontWeight.w900,
-            height: 1,
+            height: 1.1,
           ),
         ),
-
-        const Text(
+        Text(
           'STATEMENT',
           style: TextStyle(
-            fontSize: 62,
-            color: Color(0xFF0F172A),
+            fontSize: isMobile
+                ? 38
+                : 62, // FIXED: Scaled size smoothly based on screen dimension targets
+            color: const Color(0xFF0F172A),
             fontWeight: FontWeight.w900,
-            height: 1,
+            height: 1.1,
           ),
         ),
-
         ShaderMask(
-          shaderCallback: (bounds) =>
-              const LinearGradient(
-            colors: [
-              Color(0xff6D5DFB),
-              Color(0xff7C4DFF),
-            ],
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Color(0xff6D5DFB), Color(0xff7C4DFF)],
           ).createShader(bounds),
-
-          child: const Text(
+          child: Text(
             'ANALYSER',
             style: TextStyle(
-              fontSize: 68,
+              fontSize: isMobile
+                  ? 42
+                  : 68, // FIXED: Scaled size smoothly based on screen dimension targets
               color: Colors.white,
               fontWeight: FontWeight.w900,
-              height: 1,
+              height: 1.1,
             ),
           ),
         ),
-
-        const SizedBox(height: 30),
-
-        const Text(
+        const SizedBox(height: 24),
+        Text(
           'Upload your bank statement and get\nsmart insights about your spending.',
           style: TextStyle(
-            color: Color(0xFF475569),
-            fontSize: 18,
-            height: 1.7,
+            color: const Color(0xFF475569),
+            fontSize: isMobile ? 15 : 18, // Refined secondary messaging metrics
+            height: 1.6,
           ),
         ),
-
-        const SizedBox(height: 40),
-
+        const SizedBox(height: 32),
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             gradient: const LinearGradient(
-              colors: [
-                Color(0xff6D5DFB),
-                Color(0xff7C4DFF),
-              ],
+              colors: [Color(0xff6D5DFB), Color(0xff7C4DFF)],
             ),
             boxShadow: [
               BoxShadow(
-                color:
-                    const Color(0xff6D5DFB)
-                        .withOpacity(0.25),
+                color: const Color(0xff6D5DFB).withOpacity(0.25),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
             ],
           ),
-
           child: ElevatedButton.icon(
-            onPressed:
-                isLoading ? null : pickAndUploadPdf,
-
+            onPressed: isLoading ? null : pickAndUploadFile,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 34,
-                vertical: 22,
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 26 : 34,
+                vertical: isMobile ? 18 : 22,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(18),
               ),
             ),
-
             icon: const Icon(
               Icons.upload_rounded,
               color: Colors.white,
               size: 26,
             ),
-
-            label: const Text(
-              'UPLOAD PDF',
+            label: Text(
+              'UPLOAD FILE',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 20,
+                fontSize: isMobile ? 16 : 20,
                 letterSpacing: 0.5,
               ),
             ),
           ),
         ),
-
         const SizedBox(height: 18),
-
         const Text(
           'Supports PDF and CSV files',
-          style: TextStyle(
-            color: Color(0xFF64748B),
-            fontSize: 15,
-          ),
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
         ),
-
-        const SizedBox(height: 40),
-
+        const SizedBox(height: 32),
         Wrap(
-          spacing: 18,
-          runSpacing: 18,
+          spacing: 16,
+          runSpacing: 16,
           children: [
             featureCard(
               Icons.psychology_rounded,
               'AI-Powered',
               'Smart Analysis',
             ),
-
-            featureCard(
-              Icons.pie_chart_rounded,
-              'Insights',
-              'Clear Reports',
-            ),
-
-            featureCard(
-              Icons.lock_rounded,
-              'Secure',
-              '100% Private',
-            ),
+            featureCard(Icons.pie_chart_rounded, 'Insights', 'Clear Reports'),
+            featureCard(Icons.lock_rounded, 'Secure', '100% Private'),
           ],
         ),
-
         if (errorMessage != null) ...[
           const SizedBox(height: 24),
-
-          Text(
-            errorMessage!,
-            style: const TextStyle(
-              color: Colors.red,
-            ),
-          ),
+          Text(errorMessage!, style: const TextStyle(color: Colors.red)),
         ],
-
         if (isLoading) ...[
-          const SizedBox(height: 40),
-
+          const SizedBox(height: 32),
           const Row(
             children: [
               CircularProgressIndicator(),
@@ -443,141 +348,107 @@ class _UploadScreenState extends State<UploadScreen> {
   Widget buildIllustration() {
     return Center(
       child: Container(
-        height: 420,
-        width: 420,
-
+        height:
+            360, // Adjusted layout proportions slightly to look sharp on mobile screens
+        width: 360,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: RadialGradient(
             colors: [
-              const Color(0xff6D5DFB)
-                  .withOpacity(0.08),
+              const Color(0xff6D5DFB).withOpacity(0.08),
               Colors.transparent,
             ],
           ),
         ),
-
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Positioned(
-              top: 40,
-              right: 20,
-              child: dotPattern(),
-            ),
-
-            Positioned(
-              bottom: 40,
-              left: 20,
-              child: dotPattern(),
-            ),
-
+            Positioned(top: 30, right: 20, child: dotPattern()),
+            Positioned(bottom: 30, left: 20, child: dotPattern()),
             Container(
-              width: 250,
-              height: 310,
-
+              width: 230,
+              height: 280,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius:
-                    BorderRadius.circular(28),
-                border: Border.all(
-                  color: const Color(0xFFE9ECF2),
-                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFE9ECF2)),
                 boxShadow: [
                   BoxShadow(
-                    color:
-                        Colors.black.withOpacity(0.05),
+                    color: Colors.black.withOpacity(0.05),
                     blurRadius: 18,
                     offset: const Offset(0, 8),
                   ),
                 ],
               ),
-
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(22),
                 child: Column(
                   children: [
                     Container(
-                      width: 140,
-                      height: 12,
+                      width: 120,
+                      height: 10,
                       decoration: BoxDecoration(
-                        color: const Color(0xff6D5DFB)
-                            .withOpacity(0.4),
-                        borderRadius:
-                            BorderRadius.circular(20),
+                        color: const Color(0xff6D5DFB).withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-
-                    const SizedBox(height: 28),
-
-                    ...List.generate(
-                      5,
-                      (index) => Padding(
-                        padding:
-                            const EdgeInsets.only(
-                                bottom: 14),
-                        child: Container(
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFFE5E7EB,
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: List.generate(
+                          4,
+                          (index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Container(
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE5E7EB),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                            borderRadius:
-                                BorderRadius.circular(
-                                    10),
                           ),
                         ),
                       ),
                     ),
-
-                    const Spacer(),
-
+                    const SizedBox(height: 10),
                     Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment
-                              .spaceEvenly,
-                      crossAxisAlignment:
-                          CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        buildBar(40),
-                        buildBar(65),
-                        buildBar(95),
+                        buildBar(35),
                         buildBar(55),
+                        buildBar(80),
+                        buildBar(45),
                       ],
                     ),
                   ],
                 ),
               ),
             ),
-
             Positioned(
-              right: 45,
-              bottom: 70,
+              right: 50,
+              bottom: 60,
               child: Container(
-                width: 110,
-                height: 110,
+                width: 90,
+                height: 90,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xff6D5DFB),
-                    width: 10,
-                  ),
+                  border: Border.all(color: const Color(0xff6D5DFB), width: 8),
                 ),
               ),
             ),
-
             Positioned(
-              right: 25,
-              bottom: 28,
+              right: 35,
+              bottom: 25,
               child: Transform.rotate(
                 angle: 0.8,
                 child: Container(
-                  width: 16,
-                  height: 80,
+                  width: 14,
+                  height: 65,
                   decoration: BoxDecoration(
                     color: const Color(0xff6D5DFB),
-                    borderRadius:
-                        BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),
@@ -590,19 +461,17 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Widget dotPattern() {
     return SizedBox(
-      width: 70,
+      width: 60,
       child: Wrap(
         spacing: 6,
         runSpacing: 6,
         children: List.generate(
-          20,
+          16,
           (index) => Container(
             width: 4,
             height: 4,
             decoration: BoxDecoration(
-              color:
-                  const Color(0xff6D5DFB)
-                      .withOpacity(0.25),
+              color: const Color(0xff6D5DFB).withOpacity(0.25),
               shape: BoxShape.circle,
             ),
           ),
@@ -613,7 +482,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Widget buildBar(double height) {
     return Container(
-      width: 22,
+      width: 18,
       height: height,
       decoration: BoxDecoration(
         color: const Color(0xff6D5DFB),
@@ -622,4 +491,3 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 }
-

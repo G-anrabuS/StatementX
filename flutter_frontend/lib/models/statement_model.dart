@@ -21,8 +21,8 @@ class Transaction {
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
-      date: json['date'],
-      narration: json['narration'],
+      date: json['date'] ?? '',
+      narration: json['narration'] ?? '',
       debit: (json['debit'] ?? 0).toDouble(),
       credit: (json['credit'] ?? 0).toDouble(),
       balance: (json['balance'] ?? 0).toDouble(),
@@ -34,11 +34,13 @@ class Transaction {
 }
 
 class StatementResponse {
+  final String? statementId;
   final String bankName;
   final int totalTransactions;
   final List<Transaction> transactions;
 
   StatementResponse({
+    this.statementId,
     required this.bankName,
     required this.totalTransactions,
     required this.transactions,
@@ -46,10 +48,11 @@ class StatementResponse {
 
   factory StatementResponse.fromJson(Map<String, dynamic> json) {
     return StatementResponse(
-      bankName: json['bank_name'],
-      totalTransactions: json['total_transactions'],
-      transactions: (json['transactions'] as List)
-          .map((txn) => Transaction.fromJson(txn))
+      statementId: json['statement_id'] ?? json['id'],
+      bankName: json['bank_name'] ?? 'Unknown Bank',
+      totalTransactions: json['total_transactions'] ?? 0,
+      transactions: (json['transactions'] as List? ?? [])
+          .map((item) => Transaction.fromJson(item))
           .toList(),
     );
   }
