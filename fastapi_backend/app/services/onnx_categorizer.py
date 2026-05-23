@@ -124,8 +124,8 @@ def categorize_items(descriptions):
         outputs = session.run(
             None,
             {
-                "input_ids": inputs["input_ids"],
-                "attention_mask": inputs["attention_mask"],
+                "input_ids": inputs["input_ids"].astype(np.int64),
+                "attention_mask": inputs["attention_mask"].astype(np.int64),
             },
         )
 

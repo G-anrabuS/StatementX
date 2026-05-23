@@ -5,6 +5,7 @@ fastapi_backend/__pycache__/
 fastapi_backend/**/*.pyc
 fastapi_backend/.pytest_cache/
 fastapi_backend/.env
+fastapi_backend/onnx_model/
 
 # === Flutter Frontend ===
 flutter_frontend/.dart_tool/
@@ -30,3 +31,4 @@ Thumbs.db
 *.ntvs*
 *.njsproj
 *.sln
+.db
