@@ -2,8 +2,11 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List
 from app.models.statement import Statement
-from app.schemas.insights import StatementInsightsResponse
+from app.schemas.insights import StatementInsightsResponse, AICoachResponse, ChatRequest, ChatResponse
 from app.services.insights_service import InsightsService
+from app.services.chatbot_service import ChatbotService
+
+
 
 from app.schemas.statements import (
     StatementExtractionResponse,
@@ -168,10 +171,60 @@ async def get_statement_insights(
     for a specific statement ID.
     """
     try:
-        insights = InsightsService.generate_statement_insights(db, statement_id)
+        insights = await InsightsService.generate_statement_insights(db, statement_id)
         return insights
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Insights engine failure: {str(e)}",
         )
+
+
+@router.get("/{statement_id}/ai-coach", response_model=AICoachResponse)
+async def get_statement_ai_coach(
+    statement_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves and generates ONLY the AI-powered financial summary and recommendations
+    (narrative coach analysis and structured prioritized actions) for a specific statement ID.
+    """
+    try:
+        insights = await InsightsService.generate_statement_insights(db, statement_id)
+        return AICoachResponse(
+            summary=insights.ai_summary,
+            recommendations=insights.ai_recommendations,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI coach engine failure: {str(e)}",
+        )
+
+
+@router.post("/{statement_id}/chat", response_model=ChatResponse)
+async def chat_with_statement(
+    statement_id: str,
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    RAG-based semantic chatbot to chat with a bank statement's transactions.
+    Indexes narration descriptions into 768-dimension vectors and searches them semantically.
+    """
+    try:
+        reply, sources = await ChatbotService.chat_with_statement(
+            db=db,
+            statement_id=statement_id,
+            message=payload.message,
+            chat_history=payload.chat_history
+        )
+        return ChatResponse(response=reply, sources=sources)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Chatbot service failure: {str(e)}",
+        )
+
+
+

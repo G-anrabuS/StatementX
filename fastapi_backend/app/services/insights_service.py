@@ -1,19 +1,28 @@
 import re
+import logging
 from datetime import datetime, date
 from collections import defaultdict
 from typing import List, Dict, Tuple
 from sqlalchemy.orm import Session
 
 from app.models.transaction import Transaction
-from app.schemas.insights import StatementInsightsResponse, SubscriptionItem, AnomalyItem
+from app.services.ai_coach_service import AICoachService
+from app.schemas.insights import (
+    StatementInsightsResponse,
+    SubscriptionItem,
+    AnomalyItem,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class InsightsService:
     @staticmethod
-    def generate_statement_insights(db: Session, statement_id: str) -> StatementInsightsResponse:
+    async def generate_statement_insights(db: Session, statement_id: str) -> StatementInsightsResponse:
         """
         Processes database records for a specific statement to calculate aggregates,
-        identify recurring subscriptions, and flag potential transaction anomalies.
+        identify recurring subscriptions, flag potential transaction anomalies, and
+        generate AI-powered cash flow summaries and recommendations.
         """
         # 1. Fetch transactions chronologically
         transactions = (
@@ -32,7 +41,9 @@ class InsightsService:
                 highest_spending_category="None",
                 category_breakdown={},
                 subscriptions=[],
-                anomalies=[]
+                anomalies=[],
+                ai_summary="No transaction data available.",
+                ai_recommendations=[]
             )
 
         # 2. Basic Aggregations
@@ -73,6 +84,21 @@ class InsightsService:
         # 4. Detect Unusual Transactions (Anomalies)
         anomalies = InsightsService._detect_anomalies(debit_transactions, debit_amounts)
 
+        # 5. Persistent Caching & AI Generation Layer (Decoupled & Modularized)
+        ai_summary, ai_recommendations = await AICoachService.get_or_generate_coach_insights(
+            db=db,
+            statement_id=statement_id,
+            debit_transactions=debit_transactions,
+            total_income=total_income,
+            total_expense=total_expense,
+            net_savings=net_savings,
+            saving_rate=saving_rate,
+            highest_spending_category=highest_spending_category,
+            category_breakdown=category_breakdown,
+            subscriptions=subscriptions,
+            anomalies=anomalies
+        )
+
         return StatementInsightsResponse(
             total_income=round(total_income, 2),
             total_expense=round(total_expense, 2),
@@ -81,8 +107,13 @@ class InsightsService:
             highest_spending_category=highest_spending_category,
             category_breakdown={k: round(v, 2) for k, v in category_breakdown.items()},
             subscriptions=subscriptions,
-            anomalies=anomalies
+            anomalies=anomalies,
+            ai_summary=ai_summary,
+            ai_recommendations=ai_recommendations
         )
+
+
+
 
     @staticmethod
     def _detect_subscriptions(transactions: List[Transaction]) -> List[SubscriptionItem]:

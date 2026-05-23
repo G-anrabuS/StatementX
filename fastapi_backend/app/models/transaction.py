@@ -1,5 +1,6 @@
 import uuid
 from sqlalchemy import Column, String, Date, Numeric, Float, ForeignKey, Boolean
+from pgvector.sqlalchemy import Vector
 from app.core.database import Base, GUID
 
 
@@ -50,3 +51,6 @@ class Transaction(Base):
         default=0.0,
         nullable=False,
     )
+    
+    # 768-dimension pgvector embedding for Gemini text-embedding-004
+    embedding = Column(Vector(768), nullable=True)
