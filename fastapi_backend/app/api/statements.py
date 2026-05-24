@@ -119,7 +119,7 @@ async def extract_statement(
 
     # Layer 2: Client-Declared MIME-Type Verification
     content_type = file.content_type.lower() if file.content_type else ""
-    valid_pdf_mimes = ["application/pdf", "application/x-pdf"]
+    valid_pdf_mimes = ["application/pdf", "application/x-pdf","application/octet-stream"]
     valid_csv_mimes = ["text/csv", "application/vnd.ms-excel", "text/plain", "application/octet-stream"]
     
     if is_pdf and content_type and not any(mime in content_type for mime in valid_pdf_mimes):

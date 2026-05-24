@@ -8,8 +8,8 @@ import 'services/auth_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  final bool loggedIn = await AuthService.isLoggedIn();
-  runApp(StatementXApp(initialRoute: loggedIn ? const HomeScreen() : const LoginScreen()));
+  // Always launch the HomeScreen, which dynamically renders the landing page for guest users
+  runApp(const StatementXApp(initialRoute: HomeScreen()));
 }
 
 class StatementXApp extends StatefulWidget {
@@ -34,7 +34,7 @@ class _StatementXAppState extends State<StatementXApp> {
         final userData = await AuthService.syncWithBackend(user);
         if (userData != null && mounted) {
           setState(() {
-            _currentRoute = const HomeScreen();
+            _currentRoute = HomeScreen(key: UniqueKey());
           });
         }
       }

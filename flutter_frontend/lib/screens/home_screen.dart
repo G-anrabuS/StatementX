@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:google_sign_in_web/web_only.dart' as web;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../theme/app_theme.dart';
 import '../models/insights_model.dart';
 import '../models/statement_model.dart';
@@ -32,40 +35,101 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   StatementInsights? _insights;
   List<StatementMetadata> _statements = [];
+  bool _isUserLoggedIn = false;
+  StreamSubscription? _authSubscription;
+  bool _hasRedirectedToUpload = false;
 
   @override
   void initState() {
     super.initState();
+    
+    // Listen for Google Auth changes (for Web GIS button support)
+    _authSubscription = AuthService.onUserChanged.listen((user) async {
+      if (user != null) {
+        // Allow brief time for backend sync stream in main.dart to complete
+        await Future.delayed(const Duration(milliseconds: 500));
+        _refreshData();
+      }
+    });
+
     _refreshData();
   }
 
   Future<void> _refreshData() async {
     setState(() => _isLoading = true);
     try {
-      final statements = await StatementService.listStatements();
-      if (statements.isNotEmpty) {
-        final latest = statements.first;
-        final insights = await StatementService.getStatementInsights(latest.statementId);
-        
-        setState(() {
-          _statements = statements;
-          currentStatementId = latest.statementId;
-          currentBankName = latest.bankName;
-          _insights = insights;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _statements = [];
-          currentStatementId = null;
-          currentBankName = null;
-          _insights = null;
-          _isLoading = false;
-        });
+      final bool loggedIn = await AuthService.isLoggedIn();
+      setState(() {
+        _isUserLoggedIn = loggedIn;
+      });
+
+      if (loggedIn) {
+        try {
+          final statements = await StatementService.listStatements();
+          
+          StatementMetadata? latest;
+          StatementInsights? insights;
+          if (statements.isNotEmpty) {
+            latest = statements.first;
+            insights = await StatementService.getStatementInsights(latest.statementId);
+          }
+          
+          setState(() {
+            _statements = statements;
+            currentStatementId = latest?.statementId;
+            currentBankName = latest?.bankName;
+            _insights = insights;
+            _isLoading = false;
+          });
+          
+          // ALWAYS redirect to the PDF upload page upon sign-in completion
+          if (!_hasRedirectedToUpload) {
+            _hasRedirectedToUpload = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              // If a login dialog or overlay is open, safely dismiss it first
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+              _navigateToUploader();
+            });
+          }
+          return;
+        } catch (err) {
+          final errMsg = err.toString();
+          if (errMsg.contains('401') || errMsg.contains('unauthorized') || errMsg.contains('credentials') || errMsg.contains('authenticated')) {
+            print('Authentication token is stale or invalid. Clearing session.');
+            await AuthService.logout();
+            _hasRedirectedToUpload = false; // Reset redirect flag
+            setState(() {
+              _isUserLoggedIn = false;
+              _statements = [];
+              currentStatementId = null;
+              currentBankName = null;
+              _insights = null;
+              _isLoading = false;
+            });
+            return;
+          }
+          rethrow;
+        }
       }
+      
+      setState(() {
+        _statements = [];
+        currentStatementId = null;
+        currentBankName = null;
+        _insights = null;
+        _isLoading = false;
+      });
     } catch (e) {
       print('Error refreshing home data: $e');
-      setState(() => _isLoading = false);
+      setState(() {
+        _statements = [];
+        currentStatementId = null;
+        currentBankName = null;
+        _insights = null;
+        _isLoading = false;
+      });
     }
   }
 
@@ -105,6 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _authSubscription?.cancel();
     super.dispose();
   }
 
@@ -194,6 +259,37 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildHeaderNavLink('Features', () => _scrollToSection(_featuresKey)),
           _buildHeaderNavLink('Security', () => _scrollToSection(_securityKey)),
           const SizedBox(width: 8),
+          if (!_isUserLoggedIn) ...[
+            TextButton(
+              onPressed: _showLoginDialog,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                foregroundColor: brandBlue,
+              ),
+              child: const Text(
+                'Login',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+              ),
+            ),
+            const SizedBox(width: 4),
+            ElevatedButton(
+              onPressed: _showLoginDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brandBlue,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Sign Up',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
         ],
         IconButton(
           icon: Icon(
@@ -589,11 +685,15 @@ class _HomeScreenState extends State<HomeScreen> {
               _scrollToSection(_securityKey);
             }),
             const Divider(indent: 16, endIndent: 16),
-            if (currentStatementId != null) ...[
-               _buildDrawerItem(Icons.logout_rounded, 'Sign Out', () {
-                 Navigator.pop(context);
-                 _handleLogout();
-               }),
+            if (_isUserLoggedIn) ...[
+              _buildDrawerItem(Icons.upload_file_rounded, 'Upload Statement', () {
+                Navigator.pop(context);
+                _navigateToUploader();
+              }),
+              _buildDrawerItem(Icons.logout_rounded, 'Sign Out', () {
+                Navigator.pop(context);
+                _handleLogout();
+              }),
             ] else ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -603,7 +703,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      _navigateToUploader();
+                      _showLoginDialog();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: brandBlue,
@@ -612,7 +712,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Get Started',
+                      'Login / Sign Up',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
@@ -711,10 +811,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         SizedBox(height: isMobile ? 24 : 36),
         SizedBox(
-          width: isMobile ? double.infinity : 200,
+          width: isMobile ? double.infinity : 260,
           height: 52,
           child: ElevatedButton(
-            onPressed: _navigateToUploader,
+            onPressed: _isUserLoggedIn ? _navigateToUploader : _showLoginDialog,
             style: ElevatedButton.styleFrom(
               backgroundColor: brandBlue,
               shape: RoundedRectangleBorder(
@@ -723,11 +823,11 @@ class _HomeScreenState extends State<HomeScreen> {
               elevation: 0,
             ),
             child: const Text(
-              'Get Started',
+              'Analyze your statement now',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 15,
               ),
             ),
           ),
@@ -1324,11 +1424,214 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _handleLogout() async {
     await AuthService.logout();
+    _hasRedirectedToUpload = false;
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
     }
   }
+
+  Future<void> _handleDirectLoginMobile() async {
+    setState(() => _isLoading = true);
+    final user = await AuthService.signInWithGoogle();
+    setState(() => _isLoading = false);
+
+    if (user != null) {
+      _refreshData();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed. Please try again.')),
+        );
+      }
+    }
+  }
+
+  void _showLoginDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        final isDark = _isDarkMode;
+
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          elevation: 16,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: isDark ? Colors.white70 : Colors.black54),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4F46E5).withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.account_balance_rounded,
+                    color: Color(0xFF4F46E5),
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Welcome to StatementX',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Access your premium bank statement insights, AI semantic chat, and visual financial indicators by signing in below.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.45,
+                    color: isDark ? Colors.white60 : const Color(0xFF475569),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
+                // Unified Sign In Section
+                if (kIsWeb) ...[
+                  // Official Google-branded button for Web (GIS)
+                  Container(
+                    width: 250,
+                    height: 50,
+                    alignment: Alignment.center,
+                    child: web.renderButton(),
+                  ),
+                ] else ...[
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _handleDirectLoginMobile();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF475569),
+                      elevation: 2,
+                      side: const BorderSide(color: Color(0xFFCBD5E1), width: 1),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Custom Google G-Logo using standard CustomPainter for accuracy
+                        CustomPaint(
+                          size: const Size(20, 20),
+                          painter: GoogleLogoPainter(),
+                        ),
+                        const SizedBox(width: 14),
+                        const Text(
+                          'Sign in with Google',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                const SizedBox(height: 24),
+                Text(
+                  'Secured by Google Identity Services',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double r = w / 2;
+
+    final Paint paint = Paint()..style = PaintingStyle.fill;
+
+    // Red Arc (Top Left & Top)
+    paint.color = const Color(0xFFEA4335);
+    final Path redPath = Path()
+      ..moveTo(r, r)
+      ..lineTo(r - r * 0.7071, r - r * 0.7071)
+      ..arcTo(Rect.fromCircle(center: Offset(r, r), radius: r), -2.356, 2.356, false)
+      ..lineTo(r, r)
+      ..close();
+    canvas.drawPath(redPath, paint);
+
+    // Yellow Arc (Bottom Left & Left)
+    paint.color = const Color(0xFFFBBC05);
+    final Path yellowPath = Path()
+      ..moveTo(r, r)
+      ..lineTo(r - r * 0.7071, r + r * 0.7071)
+      ..arcTo(Rect.fromCircle(center: Offset(r, r), radius: r), -3.927, 1.571, false)
+      ..lineTo(r - r * 0.7071, r - r * 0.7071)
+      ..close();
+    canvas.drawPath(yellowPath, paint);
+
+    // Green Arc (Bottom & Bottom Right)
+    paint.color = const Color(0xFF34A853);
+    final Path greenPath = Path()
+      ..moveTo(r, r)
+      ..lineTo(r + r * 0.95, r + r * 0.3)
+      ..arcTo(Rect.fromCircle(center: Offset(r, r), radius: r), 0.3, 2.05, false)
+      ..lineTo(r - r * 0.7071, r + r * 0.7071)
+      ..close();
+    canvas.drawPath(greenPath, paint);
+
+    // Blue Section (Right & bar)
+    paint.color = const Color(0xFF4285F4);
+    final Path bluePath = Path()
+      ..moveTo(r, r)
+      ..lineTo(r + r, r)
+      ..arcTo(Rect.fromCircle(center: Offset(r, r), radius: r), 0, 0.3, false)
+      ..lineTo(r + r * 0.95, r + r * 0.3)
+      ..lineTo(r + r * 0.3, r + r * 0.3)
+      ..lineTo(r + r * 0.3, r - r * 0.2)
+      ..lineTo(r + r, r - r * 0.2)
+      ..close();
+    canvas.drawPath(bluePath, paint);
+
+    // Inner cutout to make it a G ring
+    final Paint cutoutPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(r, r), r * 0.6, cutoutPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
