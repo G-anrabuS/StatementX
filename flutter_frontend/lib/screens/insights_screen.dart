@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import '../models/insights_model.dart';
 import '../theme/app_theme.dart';
+// Import the new intelligence screen layers
+import 'visualization_screen.dart';
+import 'ai_coach_screen.dart';
+import 'chat_bot_screen.dart';
 
 class InsightsScreen extends StatefulWidget {
+  final String statementId; // Added to map backend endpoints cleanly
   final String bankName;
   final StatementInsights insights;
   final int totalTransactions;
 
   const InsightsScreen({
     super.key,
+    required this.statementId,
     required this.bankName,
     required this.insights,
     required this.totalTransactions,
@@ -36,6 +42,97 @@ class _InsightsScreenState extends State<InsightsScreen> {
       default:
         return AppColors.secondaryTeal;
     }
+  }
+
+  Widget _buildQuickActionMenu(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Advanced Ledger Intelligence',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildActionButton(
+                  context,
+                  label: 'Analytics Dashboard',
+                  icon: Icons.bar_chart_rounded,
+                  color: const Color(0xFF1565C0),
+                  targetScreen: VisualizationScreen(
+                    statementId: widget.statementId,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _buildActionButton(
+                  context,
+                  label: 'AI Executive Coach',
+                  icon: Icons.bolt,
+                  color: const Color(0xFFE65100),
+                  targetScreen: AICoachScreen(statementId: widget.statementId),
+                ),
+                const SizedBox(width: 10),
+                _buildActionButton(
+                  context,
+                  label: 'Semantic Chat',
+                  icon: Icons.chat_bubble_outline_rounded,
+                  color: AppColors.secondaryTeal,
+                  targetScreen: ChatBotScreen(statementId: widget.statementId),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color color,
+    required Widget targetScreen,
+  }) {
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color.withOpacity(0.08),
+        foregroundColor: color,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: color.withOpacity(0.2)),
+        ),
+      ),
+      icon: Icon(icon, size: 16),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+      ),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => targetScreen),
+        );
+      },
+    );
   }
 
   Widget _buildStatCard({
@@ -450,6 +547,10 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 24),
+
+                // Inject the Quick Actions Analytics Control Hub
+                _buildQuickActionMenu(context),
+
                 GridView.count(
                   crossAxisCount: isMobile ? 2 : 4,
                   mainAxisSpacing: 14,

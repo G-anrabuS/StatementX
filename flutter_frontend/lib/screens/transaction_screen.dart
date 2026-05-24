@@ -173,6 +173,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => InsightsScreen(
+              statementId: widget.statementId!,
               bankName: widget.bankName,
               insights: insights,
               totalTransactions: widget.transactions.length,
