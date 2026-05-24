@@ -101,18 +101,63 @@ async def extract_statement(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
+    # === TRIPLE-LAYER SECURITY SANITIZATION ENGINE ===
+    
+    # Layer 1: Extension Verification
     filename_lower = file.filename.lower()
     is_pdf = filename_lower.endswith(".pdf")
     is_csv = filename_lower.endswith(".csv")
 
     if not (is_pdf or is_csv):
         raise HTTPException(
-            status_code=400, detail="Only PDF and CSV files are allowed"
+            status_code=400,
+            detail="Security Verification Failed: Only PDF and CSV files are allowed."
         )
 
-    try:
-        file_bytes = await file.read()
+    # Layer 2: Client-Declared MIME-Type Verification
+    content_type = file.content_type.lower() if file.content_type else ""
+    valid_pdf_mimes = ["application/pdf", "application/x-pdf"]
+    valid_csv_mimes = ["text/csv", "application/vnd.ms-excel", "text/plain", "application/octet-stream"]
+    
+    if is_pdf and content_type and not any(mime in content_type for mime in valid_pdf_mimes):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Security Verification Failed: Mismatched MIME type for PDF file (found '{content_type}')."
+        )
+    if is_csv and content_type and not any(mime in content_type for mime in valid_csv_mimes):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Security Verification Failed: Mismatched MIME type for CSV file (found '{content_type}')."
+        )
 
+    # Read binary bytes
+    file_bytes = await file.read()
+    
+    # Layer 3: Forensic Binary Signature Magic-Number Verification
+    header_bytes = file_bytes[:1024]
+    
+    if is_pdf:
+        # Check PDF Magic-Number Signature (%PDF -> Hex: 25 50 44 46)
+        if not header_bytes.startswith(b"%PDF"):
+            raise HTTPException(
+                status_code=400,
+                detail="Security Verification Failed: Legitimate PDF magic signature missing from file header."
+            )
+    else:
+        # Check CSV plain text safety (reject Windows 'MZ' exe or Linux 'ELF' executable magic signatures)
+        if header_bytes.startswith(b"MZ") or header_bytes.startswith(b"\x7fELF"):
+            raise HTTPException(
+                status_code=400,
+                detail="Security Verification Failed: Executable binary signature detected in text upload."
+            )
+        # Scan for binary null control characters which don't exist in valid plain-text CSV
+        if b"\x00" in header_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail="Security Verification Failed: Binary null control characters detected inside text upload."
+            )
+
+    try:
         if is_csv:
             parsed_result = CSVStatementService.parse_csv(
                 csv_bytes=file_bytes,
