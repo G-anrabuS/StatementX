@@ -1,148 +1,110 @@
-# StatementX 📊🚀
+# StatementX 📊🚀✨
 
-StatementX is an end-to-end, AI-powered Bank Statement Analyser built as a cross-platform application (**Flutter Web & Android**) supported by a high-performance **FastAPI backend**. It securely extracts transactions from raw files, categorizes financial rows dynamically using a trained machine learning model, detects recurring subscription lines, and identifies unusual financial anomalies.
+**StatementX** is a secure, enterprise-grade, and AI-powered **Bank Statement Analyzer & Financial Coaching Ecosystem**. 
 
-Now featuring **Multi-tenant User Ownership** via Google OAuth integration.
-
----
-
-## 🛠 Project Architecture Overview
-
-The system architecture decoupling analytical processing from presentation to allow seamless cross-platform performance:
-
-- **Frontend:** Flutter (Dart) using a unified memory buffer strategy to handle files (`file_picker`). Uses **Google Identity Services (GIS)** for secure Web & Android authentication.
-- **Backend:** Python 3.10+ powered by FastAPI. Implements **JWT-based session management** and enforces strict user-data isolation (multi-tenancy).
-- **Database:** Relational engine managed via SQLAlchemy ORM. Supports **PostgreSQL** (Production) and **SQLite** (Development).
-- **Security:** Triple-layer file ingestion sanitization and **Transparent Column-Level Cryptography (AES-256)** for transaction data at rest.
+It is designed as an end-to-end multi-tenant application, featuring a cross-platform client (**Flutter Web & native Android**) backed by a high-performance **FastAPI analytical core engine**. It securely processes bank statement ledgers (PDF and CSV format), dynamically labels categories via a localized Machine Learning classification engine, identifies recurring subscription tracks, highlights anomalies, and offers interactive, context-grounded AI financial advice via a semantic RAG chatbot.
 
 ---
 
-## 🚀 How to Run the Project Locally
+## 🛠️ Unified System Architecture
 
-### Prerequisites
+StatementX decouples deep analytical processing and vector indexing from the responsive visualization layer to achieve enterprise performance:
 
-1. **Flutter SDK** installed and added to your environmental path variables.
-2. **Python 3.10 or higher** installed.
-3. **PostgreSQL** installed and running (or use fallback SQLite).
-4. A **Google Cloud Project** with OAuth 2.0 Client IDs configured.
+```mermaid
+graph TD
+    Client[Flutter Web & Android Client] <--> Nginx{Nginx Gateway Reverse Proxy}
+    Nginx <--> FrontendService[Flutter Web Static Server]
+    Nginx <--> BackendService[FastAPI Analytical Backend]
+    BackendService <--> SQLite[(Local SQLite DB)]
+    BackendService <--> PostgreSQL[(Production PostgreSQL / pgvector)]
+    BackendService <--> ONNX[Local ONNX ML Classification Runtime]
+    BackendService <--> GeminiAPI[Google Gemini Cognitive RAG API]
+```
 
----
-
-### Phase 0: Google Cloud Configuration
-
-To enable Google Sign-In, you must configure your credentials in the [Google Cloud Console](https://console.cloud.google.com/):
-
-1.  **Web Client ID:** Create an OAuth 2.0 Client ID for "Web Application".
-2.  **Android Client ID:** 
-    *   Find your SHA-1 fingerprint:
-        ```bash
-        cd flutter_frontend/android
-        ./gradlew signingReport
-        ```
-    *   Create an OAuth 2.0 Client ID for "Android" using your package name and SHA-1.
-3.  **Enable People API:** Search for "People API" in the Google Cloud Library and click **ENABLE**.
+* **Frontend ([Flutter Folder](file:///c:/StatementX-1/flutter_frontend/README.md)):** Unified cross-platform app utilizing Google Identity Services (OAuth 2.0) for SSO. Renders interactive financial indicators, budgets, cash flows, and typing chat sessions using glassmorphic UI aesthetics.
+* **Backend ([FastAPI Folder](file:///c:/StatementX-1/fastapi_backend/README.md)):** High-speed asynchronous Python engine. Enforces JWT-based session scopes, isolates user multi-tenancy, sanitizes ingested binaries, encrypts tables at rest, and manages vector pipelines.
+* **Database & Vector Core:** Integrates platform-agnostic ORM mappings. Employs PostgreSQL with native `pgvector` index clustering in production, alongside custom connection triggers in SQLite for seamless local vector calculations.
 
 ---
 
-### Phase 1: Launch the FastAPI Backend
+## 📂 Repository Blueprint
 
-1. Navigate to the backend directory:
-    ```bash
-    cd fastapi_backend
-    ```
-
-2. Generate a local Python virtual environment and activate it:
-    ```bash
-    # Windows
-    python -m venv venv
-    .\venv\Scripts\activate
-
-    # macOS / Linux
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-
-3. Install all dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4. **Environment Setup:** Create a `.env` file in `fastapi_backend/` (use `.env.example` as a template):
-    ```ini
-    GEMINI_API_KEY=your_key
-    DATABASE_URL=postgresql://user:pass@localhost:5432/statementx
-    SECRET_KEY=any_long_random_string
-    GOOGLE_WEB_CLIENT_ID=your-web-id.apps.googleusercontent.com
-    GOOGLE_ANDROID_CLIENT_ID=your-android-id.apps.googleusercontent.com
-    ```
-
-5. Initialize the database schemas:
-    ```bash
-    python create_tables.py
-    ```
-
-6. Boot the server:
-    ```bash
-    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-    ```
+```
+StatementX/
+├── fastapi_backend/        # FastAPI Core Service, Local ONNX Models & Parsers
+├── flutter_frontend/       # Flutter Web & Android Multiplatform Client App
+├── nginx/                  # Nginx Proxy Configuration (Gateway Routing & SSL limits)
+├── certbot/                # Certbot configuration hooks for auto Let's Encrypt SSL
+├── docker-compose.yml      # Multi-container Production Orchestrator
+├── setup.sh                # Linux/macOS One-Click Containerization Setup script
+├── setup.bat               # Windows One-Click Containerization Setup script
+└── readme.md               # Unified Repository Documentation (This file)
+```
 
 ---
 
-### Phase 2: Spin Up the Flutter Frontend
+## 🚀 Local Development (Sandboxed Sandbox)
 
-1. Navigate to the frontend directory:
-    ```bash
-    cd flutter_frontend
-    ```
-
-2. **Environment Setup:** Create a `.env` file inside `flutter_frontend/assets/`:
-    ```ini
-    GOOGLE_WEB_CLIENT_ID=your-web-id.apps.googleusercontent.com
-    GOOGLE_ANDROID_CLIENT_ID=your-android-id.apps.googleusercontent.com
-    ```
-
-3. Fetch dependencies:
-    ```bash
-    flutter pub get
-    ```
-
-4. **Web Configuration:** Open `web/index.html` and ensure the Google meta tag matches your Web Client ID:
-    ```html
-    <meta name="google-signin-client_id" content="your-web-id.apps.googleusercontent.com">
-    ```
-
-5. Run the application:
-    ```bash
-    # For Web
-    flutter run -d chrome
-
-    # For Android
-    flutter run -d your_device_id
-    ```
+To boot individual modules locally without Docker during development, refer to their dedicated README guides:
+* 🐍 **Backend Setup Guide:** [FastAPI Backend README](file:///c:/StatementX-1/fastapi_backend/README.md)
+* 📱 **Frontend Setup Guide:** [Flutter Frontend README](file:///c:/StatementX-1/flutter_frontend/README.md)
 
 ---
 
-## 🔒 Crucial Mobile Production Configuration
+## 🐳 One-Click Production Deployment (Docker Compose)
 
-If deploying to Android, verify these properties in `android/app/src/main/AndroidManifest.xml`:
+StatementX provides a production-ready, multi-container orchestration system out of the box using Docker.
 
-1.  **Cleartext Traffic:** Allow `http` for local development:
-    ```xml
-    <application android:usesCleartextTraffic="true" ...>
-    ```
-2.  **Internet Permission:**
-    ```xml
-    <uses-permission android:name="android.permission.INTERNET" />
-    ```
+### 1. Multi-Container Orchestration Cluster
+* **`nginx`:** Gateway reverse proxy binding ports `80` and `443` to route traffic dynamically to static frontend assets or secure backend endpoints.
+* **`frontend`:** Serves static web assets securely over Nginx.
+* **`backend`:** Asynchronous core service running calculations, loading ONNX classifiers, and handling PDF parsing.
+* **`db`:** PostgreSQL database service featuring a native `pgvector/pgvector:16-pgdg` cluster for highly-performant spatial embeddings and transaction lookups.
+
+### 2. Launching via Setup Scripts
+
+We provide one-click initialization setups to verify configuration folders, create directories, and validate environments:
+
+#### On Linux or macOS:
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+#### On Windows:
+```cmd
+setup.bat
+```
+
+The script will automatically check for a `.env` file at root (using `.env.example` as a template). Ensure you configure the secrets before proceeding:
+```ini
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=secure_production_db_password
+POSTGRES_DB=statementx
+GEMINI_API_KEY=your_google_gemini_developer_key
+SECRET_KEY=your_high_entropy_jwt_secret
+GOOGLE_WEB_CLIENT_ID=your-google-oauth-web-client-id
+GOOGLE_ANDROID_CLIENT_ID=your-google-oauth-android-client-id
+```
+
+### 3. Spin Up the Containers
+Once `.env` is ready, trigger Docker to pull, build, and boot the entire stack in the background:
+```bash
+docker compose up -d --build
+```
+
+### 4. Watch Database Migrations & Logs
+Verify the backend container initializes schemas and mounts ONNX weights safely:
+```bash
+docker compose logs -f backend
+```
 
 ---
 
-## 📂 Feature Scope Matrix
+## 🔒 Strict Financial Security & Compliance Guarantees
 
-- [x] **Multi-tenant Authentication:** Secure Google OAuth login for Web & Android.
-- [x] **Cross-Format Upload Parser:** Support for `.pdf` and `.csv` statement parsing.
-- [x] **User Ownership:** Private data isolation; users only see their own statements.
-- [x] **Automated ML Classification:** Local transaction categorization using ONNX.
-- [x] **AI Financial Coach:** Narrative health summaries and prioritized actions.
-- [x] **Semantic RAG Chat:** Chat with your bank statements using vector search.
-- [x] **At-Rest Encryption:** Industry-standard AES-256 encryption for financial data.
+StatementX is designed to handle highly sensitive personal bank records securely:
+1. **No Data Leaks:** Strict multi-tenant row-level access validation ensures a user can never retrieve or query another user's statement records.
+2. **Zero-Outside-Memory Chat:** The semantic RAG chatbot is instruction-locked to discuss *only* the local statement context, strictly blocking prompt-injection attempts and general factual hallucination.
+3. **Double Guard at Rest:** Slabs of transaction data are encrypted with **AES-256 (Fernet)**, securing confidential accounts even in the event of database physical theft.
+4. **Triple-Layer Binary Guard:** Blocks spoofed code scripts, binaries, and null control injections before files are processed by parsing engines.

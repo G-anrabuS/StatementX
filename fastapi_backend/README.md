@@ -1,33 +1,27 @@
-# StatementX AI Core Engine 📊🚀
+# StatementX AI Core Engine (Backend) 📊🐍⚙️
 
-The **StatementX Backend** is a high-performance, robust, and intelligent bank statement parser and analytical engine built using **FastAPI** and **Python 3.10+**. It implements a dual-mode parser (PDF & CSV), a localized machine learning inference categorizer, dynamic cash-flow auditing, and a RAG (Retrieval-Augmented Generation) semantic chat interface.
+The **StatementX Backend** is an asynchronous, high-performance financial analytics and parsing service built with **FastAPI** and **Python 3.10+**. 
 
----
-
-## 🛠️ System Architecture & Technology Stack
-
-The backend is engineered for high scalability, decoupling AI/ML inferences from storage layers:
-
-* **Framework:** **FastAPI** + **Uvicorn** for real-time asynchronous HTTP operations.
-* **ML Inference Engine:** Localized sequence classification models loaded through **ONNX Runtime** (`onnxruntime`, `optimum`, `transformers`, `torch`) for sub-millisecond transaction categorization.
-* **Database Layer:** Platform-agnostic **SQLAlchemy ORM** supporting both **PostgreSQL** (production ready with native `pgvector`) and a self-healing **SQLite** fallback connection with a custom-injected similarity function.
-* **Parser Layer:** Asynchronous **PyPDF** and high-speed **Polars** engines for parsing transaction statements.
-* **Cognitive Services:** **Google GenAI** (Gemini) for high-fidelity insights extraction, emergency action plans, and semantic memory summaries.
+It handles cross-format bank statement parsing (PDF and CSV), runs a local machine learning categorizer via **ONNX**, detects recurring subscriptions and transaction anomalies, and provides a RAG (Retrieval-Augmented Generation) chatbot grounded in statement context.
 
 ---
 
-## 📂 Feature Scope Matrix
+## 🛠️ System Architecture & Service Layers
 
-- [x] **Cross-Format Upload Parser:** Processes both `.pdf` and `.csv` statement files asynchronously.
-- [x] **Local ONNX Classification:** Automated sequence labeling of transaction narrations into structured category tokens.
-- [x] **Smart Caching Layer:** Features a `merchant_cache` table to store verified rules and dramatically bypass redundant NLP inferences.
-- [x] **Auditor & Anomaly Engine:** Auto-scans datasets for duplicates, midnight transfers, and monthly subscription tracks.
-- [x] **Semantic RAG Chatbot:** Conversational engine featuring transaction context lookup, fallback keyword search, and memory history.
+The backend is organized as a decoupled, modular service system:
+
+* **FastAPI Framework (`app/main.py`):** Drives asynchronous, high-throughput routing. Supports auto-generated OpenAPI/Swagger documentation.
+* **Database & ORM (`app/core/database.py`):** Uses SQLAlchemy for multi-tenant database designs (supporting SQLite in local development and PostgreSQL in production).
+* **ONNX ML Categorizer (`app/services/onnx_categorizer.py`):** Executes localized NLP sequence classification models using **ONNX Runtime**, categorizing transactions in sub-milliseconds without third-party API dependencies. Includes a **Merchant Rule Cache** bypass layer.
+* **RAG Chatbot Service (`app/services/chatbot_service.py`):** Integrates Gemini API (`text-embedding-004`) to compute dense vector coordinates for transaction narrations. It merges dense vector search with a custom TF-IDF/SequenceMatcher sparse search via a **Hybrid Fusion Layer** (40% Vector + 60% Keyword overlap).
+* **Insights & Anomalies Service (`app/services/insights_service.py`):** Scans statement ledgers to detect recurring subscriptions, duplicate/midnight transactions (anomalies), and formats personalized saving plans.
+* **Visualization Service (`app/services/visualization_service.py`):** Calculates indicators like Cash Flow timelines, 50/30/20 budget framework distribution, and weekday spending patterns.
+* **Security Sanitizers:** Enforces a Triple-Layer file inspection shield and AES-256 transparent column-level encryption for data at rest.
 
 ---
 
-## 🏗️ Self-Healing Database Layer
-To enable friction-free local development with SQLite while maintaining schema-level parity with production PostgreSQL/pgvector clusters, the database layer implements a **custom connection hook** (`app/core/database.py`):
+## 🏗️ SQLite Custom-Similarity Connection Hook
+To enable parity between SQLite and production PostgreSQL vector indices (`pgvector`), the connection module (`app/core/database.py`) injects a custom hook:
 
 ```python
 def sqlite_similarity(a, b):
@@ -40,169 +34,72 @@ def setup_sqlite_connection(dbapi_connection, connection_record):
     if settings.DATABASE_URL.startswith("sqlite"):
         dbapi_connection.create_function("similarity", 2, sqlite_similarity)
 ```
-
-This dynamically binds a two-parameter `similarity(col, term)` function inside SQLite execution environments, allowing the exact same vector-similarity raw SQL queries to execute successfully on local databases without alteration.
+This dynamically maps a raw SQL similarity function into SQLite, enabling the exact same similarity searches to run in local environments.
 
 ---
 
-## 🛡️ Enterprise Security Infrastructure
-
-StatementX implements an enterprise-grade security layer to guard sensitive financial databases against unauthorized access and malicious file ingestion.
+## 🛡️ Ingestion Security & Cryptography
 
 ### 1. Triple-Layer Ingestion Security Engine
-All file uploads targeting the statement ingestion endpoint (`/api/statements/extract`) pass through a rigorous, multi-staged security validator:
+Every statement upload goes through a strict validation chain before parsing:
+* **Layer 1 (Extension Whitelist):** Enforces a strict extension check (rejecting anything other than lowercase `.pdf` or `.csv`).
+* **Layer 2 (MIME-Type Check):** Cross-references client-declared content headers (`application/pdf` or `text/csv`) with extensions to catch spoofing.
+* **Layer 3 (Forensic Magic Signature):** Scans the first 1024 binary bytes:
+  * Verifies PDFs start with `%PDF` (Hex: `25 50 44 46`).
+  * Scans CSVs to block execution codes (e.g. Windows PE headers `MZ` or Linux `ELF`) and rejects files containing control characters (`\x00`).
 
-```mermaid
-graph TD
-    File[Uploaded File] --> L1{Layer 1: Extension Check}
-    L1 -- Not .pdf/.csv --> Reject[400 Bad Request: Reject Upload]
-    L1 -- Pass --> L2{Layer 2: MIME-Type Alignment}
-    L2 -- Mismatched MIME --> Reject
-    L2 -- Pass --> L3{Layer 3: Forensic Binary Check}
-    L3 -- Non-matching Magic Number / Binary Nulls --> Reject
-    L3 -- Pass --> Parse[Successful Parsing & Extraction]
-```
-
-* **Layer 1: Extension Verification:** Enforces strict whitelist validation. Only files ending with a lowercase `.pdf` or `.csv` extension are allowed.
-* **Layer 2: Client-Declared MIME-Type Alignment:** Cross-references the browser's declared HTTP `Content-Type` header (e.g. `application/pdf` or `text/csv`) with the target extension to catch basic header-spoofing attempts.
-* **Layer 3: Forensic Magic-Number & Binary Null Inspection:** Read and scan the raw file header (first `1024` bytes) directly:
-  * For **PDFs**, verifies the file starts with the official binary signature `%PDF` (Hex: `25 50 44 46`).
-  * For **CSVs**, blocks potential executable file signatures (e.g., Windows PE `MZ` or Linux `ELF` headers) and scans for binary null control characters (`\x00`), which represent compiled payload injection.
-
-### 2. Transparent Column-Level Cryptography (At-Rest)
-To protect confidential personal financial data, StatementX employs **transparent, symmetric column-level encryption** using **AES-256 (Fernet)**.
-
-* **Encrypted Columns:** All highly sensitive text fields (like transaction descriptions, annotations) and numeric fields (amounts, balances) are seamlessly encrypted using Python's `cryptography.fernet` package before committing to the SQLite/PostgreSQL storage layer, and decrypted on-the-fly when retrieved.
-* **Database Theft Mitigation:** Even if the underlying database file (`statementx.db` or PostgreSQL storage clusters) is compromised or leaked, the transaction data remains mathematically scrambled and unreadable without the symmetric `ENCRYPTION_KEY`.
+### 2. Transparent Column-Level Encryption
+Sensitive financial fields (e.g. descriptions, debits, credits, balances) are seamlessly encrypted using **AES-256 (Fernet)** before insertion, securing the system at rest even if the database file (`statementx.db`) is leaked.
 
 ---
 
 ## 🚀 Local Installation & Setup
 
-Ensure you have **Python 3.10+** installed before proceeding.
-
-### 1. Initialize Virtual Environment
-Navigate to the backend directory and spin up a local isolation sandbox:
-
-```powershell
-# Windows
+### 1. Initialize Python Environment
+```bash
 cd fastapi_backend
 python -m venv venv
+
+# Windows Activation
 .\venv\Scripts\activate
 
-# macOS / Linux
-cd fastapi_backend
-python3 -m venv venv
+# macOS / Linux Activation
 source venv/bin/activate
 ```
 
-### 2. Install Engine Dependencies
-Install the required analytical and deep-learning runtimes:
+### 2. Install Engine Packages
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Environment Configuration
-Create a `.env` file in the root of the `fastapi_backend` directory (matching the structure of `.env.example`):
+### 3. Setup Configuration
+Create a `.env` file matching `.env.example`:
 ```ini
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=your_gemini_api_key
 DATABASE_URL=sqlite:///./statementx.db
-ENCRYPTION_KEY=your_32_byte_urlsafe_base64_fernet_key
+SECRET_KEY=your_jwt_signing_secret
+GOOGLE_WEB_CLIENT_ID=your-google-web-id
+GOOGLE_ANDROID_CLIENT_ID=your-google-android-id
 ```
-> **Note:** If you wish to migrate to production PostgreSQL, verify the `postgresql-x64` service is running locally on your target machine and adjust the `DATABASE_URL` string: `postgresql://username:password@localhost:5432/statementx`. For local testing, if `ENCRYPTION_KEY` is omitted, the engine falls back to a stable cryptographic master seed.
 
-### 4. Create Database Tables
-Initialize database tracking schemas:
+### 4. Create Tables & Boot API
 ```bash
+# Initialize DB tables
 python create_tables.py
-```
 
-### 5. Boot Up the Server
-Start the Uvicorn live reload development server:
-```bash
+# Launch development server
 uvicorn app.main:app --reload
 ```
-Once the startup cycle is complete, access the interactive OpenAPI/Swagger docs at: **`http://127.0.0.1:8000/docs`**
+Open **`http://127.0.0.1:8000/docs`** to test endpoints.
 
 ---
 
-## 🧪 Running Integration & Security Tests
-The backend is packaged with two simulation scripts to verify functional health and security boundaries.
-
-### 1. Functional E2E Integration Test
-Verifies the database lifecycle, classification accuracy, insights engine, and RAG chatbot services:
-```bash
-python run_api_test.py
-```
-
-### 2. Security Exploit & Validation Test
-Verifies the ingestion validation engine, blocking of extension-spoofed scripts, and malicious binary rejection:
+## 🧪 Security Validation Suite
+To verify the forensic magic-signature security validators and malicious payload blocks, run:
 ```bash
 python test_security_exploit.py
 ```
-
----
-
-## 🔌 API Reference & Schema Specification
-
-### Endpoints Overview
-
-| Method | Path | Auth | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/statements/extract` | None | Uploads a `.pdf` or `.csv` bank statement, parses transaction arrays, performs ML classification, caches merchants, and persists the record. |
-| `GET` | `/api/statements` | None | Lists all saved bank statements with their metadata and database IDs. |
-| `GET` | `/api/statements/{statement_id}/insights` | None | Computes transaction counts, income/expense splits, top categories, recurring subscriptions, and transaction anomalies. |
-| `GET` | `/api/statements/{statement_id}/ai-coach` | None | Generates narrative AI summaries and prioritized action items for savings health. |
-| `POST` | `/api/statements/{statement_id}/chat` | None | Asks context-aware questions to a statement's history using semantic search and RAG. |
-
----
-
-### Request & Response Examples
-
-#### 1. Statement Extraction
-* **URL:** `/api/statements/extract`
-* **Request (Multipart Form-Data):**
-  * `file`: (binary payload of `.csv` or `.pdf` ledger)
-* **Response (Status `200`):**
-```json
-{
-  "statement_id": "a7bfb96a-43ff-4d0d-96eb-b9b4b4c8dd37",
-  "bank_name": "Imported CSV Statement",
-  "total_transactions": 7,
-  "transactions": [
-    {
-      "date": "2026-05-01",
-      "narration": "UPI/SALARY/PAYROLL/CR",
-      "debit": 0.0,
-      "credit": 50000.0,
-      "balance": 50000.0,
-      "category": "Salary & Income",
-      "sub_category": "Salary",
-      "confidence": 1.0
-    }
-  ]
-}
-```
-
-#### 2. Chatbot Semantic Query
-* **URL:** `/api/statements/{statement_id}/chat`
-* **Request Body (JSON):**
-```json
-{
-  "message": "Do I have any Netflix streaming commitments?",
-  "chat_history": []
-}
-```
-* **Response (Status `200`):**
-```json
-{
-  "response": "Based on your bank statements, you have a recurring Netflix streaming commitment of INR 199.00 debited monthly...",
-  "sources": [
-    {
-      "date": "2026-05-10",
-      "description": "UPI/NETFLIX/STREAMING",
-      "similarity": 0.425
-    }
-  ]
-}
-```
+This script tests:
+1. Legitimate PDF bypass confirmation.
+2. Extension-spoofed text scripts blocks.
+3. Windows binary executable masquerades blocks.
