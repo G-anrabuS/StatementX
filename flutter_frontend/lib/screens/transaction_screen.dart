@@ -34,7 +34,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       case 'income':
         return AppColors.primaryGreen;
       default:
-        return AppColors.secondaryTeal;
+        return AppColors.primaryColor;
     }
   }
 

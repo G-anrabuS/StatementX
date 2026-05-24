@@ -91,7 +91,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   context,
                   label: 'Semantic Chat',
                   icon: Icons.chat_bubble_outline_rounded,
-                  color: AppColors.secondaryTeal,
+                  color: AppColors.primaryColor,
                   targetScreen: ChatBotScreen(statementId: widget.statementId),
                 ),
               ],
@@ -582,7 +582,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       value:
                           '₹${widget.insights.netSavings.toStringAsFixed(0)}',
                       icon: Icons.wallet_rounded,
-                      color: AppColors.secondaryTeal,
+                      color: AppColors.secondaryColor,
                       subtext: 'Saved',
                       isMobile: isMobile,
                     ),

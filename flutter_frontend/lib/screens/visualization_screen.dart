@@ -33,7 +33,7 @@ class _VisualizationScreenState extends State<VisualizationScreen> {
       case 'excellent':
         return AppColors.primaryGreen;
       case 'good':
-        return AppColors.secondaryTeal;
+        return AppColors.secondaryColor;
       case 'fair':
         return const Color(0xFFE65100);
       default:

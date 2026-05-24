@@ -135,7 +135,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: isUser
-                                    ? AppColors.secondaryTeal
+                                    ? AppColors.primaryColor
                                     : AppColors.surfaceLight,
                                 borderRadius: BorderRadius.circular(16),
                                 border: isUser
@@ -213,7 +213,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
                                   child: const Text(
                                     "Translate",
                                     style: TextStyle(
-                                      color: AppColors.primaryGreen,
+                                      color: AppColors.primaryColor,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -247,7 +247,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.send, color: AppColors.secondaryTeal),
+                  icon: const Icon(Icons.send, color: AppColors.primaryColor),
                   onPressed: _handleSendMessage,
                 ),
               ],
