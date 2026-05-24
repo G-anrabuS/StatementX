@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart'; // Import markdown package
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../services/statement_service.dart';
 import '../theme/app_theme.dart';
 
@@ -13,10 +13,22 @@ class ChatBotScreen extends StatefulWidget {
 }
 
 class _ChatBotScreenState extends State<ChatBotScreen> {
-  // Update to track raw JSON string responses or source blocks if provided
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _textController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   Future<void> _handleSendMessage() async {
     final query = _textController.text.trim();
@@ -27,9 +39,9 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
       _messages.add({'sender': 'user', 'text': query});
       _isLoading = true;
     });
+    _scrollToBottom();
 
     try {
-      // API client function signature handles structured history
       final reply = await StatementService.chatWithStatement(
         statementId: widget.statementId,
         message: query,
@@ -46,9 +58,10 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
       setState(() {
         _messages.add({
           'sender': 'bot',
-          'text': reply, // Raw Markdown text response string rendered natively
+          'text': reply,
         });
       });
+      _scrollToBottom();
     } catch (e) {
       setState(() {
         _messages.add({
@@ -56,27 +69,11 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
           'text': 'Failed to process semantic ledger request: $e',
         });
       });
+      _scrollToBottom();
     } finally {
       setState(() {
         _isLoading = false;
       });
-    }
-  }
-
-  void _translateMessage(int index) async {
-    final msg = _messages[index];
-    try {
-      List<String> translated = await StatementService.translatePackedList(
-        items: [msg['text']],
-        targetLang: 'hi',
-      );
-      setState(() {
-        _messages[index]['text'] = translated[0];
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to translate")));
     }
   }
 
@@ -88,12 +85,20 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
         backgroundColor: AppColors.surfaceLight,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        title: const Text(
-          'Semantic Document Query',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
-          ),
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.forum_outlined, color: AppColors.primaryColor, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Semantic Ledger Assistant',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
         ),
         centerTitle: true,
       ),
@@ -101,15 +106,82 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
         children: [
           Expanded(
             child: _messages.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Ask questions like: "What subscription renewals happened in June?"',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textTertiary),
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryColor.withOpacity(0.06),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              color: AppColors.primaryColor,
+                              size: 40,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'AI Semantic Document Chat',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Ask strategic financial questions regarding your transaction history, category breakdowns, anomalies, or savings targets.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.borderLight),
+                            ),
+                            child: const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Try asking:',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '• "What is my highest spending category and total income?"',
+                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  '• "Are there any high-value or unusual transactions?"',
+                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(20),
                     itemCount: _messages.length,
                     itemBuilder: (context, idx) {
                       final msg = _messages[idx];
@@ -120,107 +192,80 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
                         alignment: isUser
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
-                        child: Column(
-                          crossAxisAlignment: isUser
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 4),
-                              padding: const EdgeInsets.all(16),
-                              constraints: BoxConstraints(
-                                maxWidth:
-                                    MediaQuery.of(context).size.width *
-                                    (isUser ? 0.75 : 0.85),
-                              ),
-                              decoration: BoxDecoration(
-                                color: isUser
-                                    ? AppColors.primaryColor
-                                    : AppColors.surfaceLight,
-                                borderRadius: BorderRadius.circular(16),
-                                border: isUser
-                                    ? null
-                                    : Border.all(color: AppColors.borderLight),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.01),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: isUser
-                                  ? Text(
-                                      textContent,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                      ),
-                                    )
-                                  : Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        MarkdownBody(
-                                          data: textContent,
-                                          styleSheet: MarkdownStyleSheet(
-                                            p: const TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontSize: 14,
-                                              height: 1.4,
-                                            ),
-                                            h3: const TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              height: 1.8,
-                                            ),
-                                            strong: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                            tableHead: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                            tableBody: const TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontSize: 13,
-                                            ),
-                                            tableBorder: TableBorder.all(
-                                              color: AppColors.borderLight,
-                                              width: 1,
-                                            ),
-                                            tableCellsPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 6,
-                                                ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(16),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width *
+                                (isUser ? 0.75 : 0.82),
+                          ),
+                          decoration: BoxDecoration(
+                            color: isUser
+                                ? AppColors.primaryColor
+                                : Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(20),
+                              topRight: const Radius.circular(20),
+                              bottomLeft: Radius.circular(isUser ? 20 : 4),
+                              bottomRight: Radius.circular(isUser ? 4 : 20),
                             ),
-                            // Translation Button - Only for Bot messages
-                            if (!isUser)
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  bottom: 14,
-                                  left: 4,
-                                ),
-                                child: InkWell(
-                                  onTap: () => _translateMessage(idx),
-                                  child: const Text(
-                                    "Translate",
-                                    style: TextStyle(
-                                      color: AppColors.primaryColor,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
+                            border: isUser
+                                ? null
+                                : Border.all(color: AppColors.borderLight),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.015),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: isUser
+                              ? Text(
+                                  textContent,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    height: 1.4,
+                                  ),
+                                )
+                              : MarkdownBody(
+                                  data: textContent,
+                                  styleSheet: MarkdownStyleSheet(
+                                    p: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 14,
+                                      height: 1.45,
                                     ),
+                                    h3: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.8,
+                                    ),
+                                    strong: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    tableHead: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    tableBody: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12.5,
+                                    ),
+                                    tableBorder: TableBorder.all(
+                                      color: AppColors.borderLight,
+                                      width: 1,
+                                    ),
+                                    tableCellsPadding:
+                                        const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
                                   ),
                                 ),
-                              ),
-                          ],
                         ),
                       );
                     },
@@ -228,27 +273,58 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
           ),
           if (_isLoading)
             const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: LinearProgressIndicator(),
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: LinearProgressIndicator(
+                backgroundColor: AppColors.borderLight,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryColor),
+              ),
             ),
           Container(
-            padding: const EdgeInsets.all(12),
-            color: AppColors.surfaceLight,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: AppColors.surfaceLight,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: Offset(0, -1),
+                ),
+              ],
+            ),
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    decoration: const InputDecoration(
-                      hintText: 'Ask your bank statement...',
-                      border: InputBorder.none,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgLight,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.borderLight),
                     ),
-                    onSubmitted: (_) => _handleSendMessage(),
+                    child: TextField(
+                      controller: _textController,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: const InputDecoration(
+                        hintText: 'Ask about transaction entries, anomalies...',
+                        hintStyle: TextStyle(color: AppColors.textTertiary),
+                        border: InputBorder.none,
+                      ),
+                      onSubmitted: (_) => _handleSendMessage(),
+                    ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send, color: AppColors.primaryColor),
-                  onPressed: _handleSendMessage,
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: _handleSendMessage,
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppColors.primaryColor,
+                    child: const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
                 ),
               ],
             ),

@@ -36,6 +36,9 @@ class AuthService {
   static Stream<GoogleSignInAccount?> get onUserChanged => _googleSignIn.onCurrentUserChanged;
 
   static String get authBaseUrl {
+    if (kIsWeb) {
+      return '${Uri.base.origin}/api/auth';
+    }
     if (defaultTargetPlatform == TargetPlatform.android && !kIsWeb) {
       return 'http://10.149.147.205:8000/api/auth';
     }

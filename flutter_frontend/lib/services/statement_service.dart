@@ -44,6 +44,9 @@ class StatementService {
   }
   // Configures local device bridge address transparently
   static String get baseUrl {
+    if (kIsWeb) {
+      return '${Uri.base.origin}/api/statements';
+    }
     if (defaultTargetPlatform == TargetPlatform.android && !kIsWeb) {
       return 'http://10.149.147.205:8000/api/statements';
     }
