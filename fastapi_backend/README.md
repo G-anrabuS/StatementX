@@ -45,6 +45,38 @@ This dynamically binds a two-parameter `similarity(col, term)` function inside S
 
 ---
 
+## 🛡️ Enterprise Security Infrastructure
+
+StatementX implements an enterprise-grade security layer to guard sensitive financial databases against unauthorized access and malicious file ingestion.
+
+### 1. Triple-Layer Ingestion Security Engine
+All file uploads targeting the statement ingestion endpoint (`/api/statements/extract`) pass through a rigorous, multi-staged security validator:
+
+```mermaid
+graph TD
+    File[Uploaded File] --> L1{Layer 1: Extension Check}
+    L1 -- Not .pdf/.csv --> Reject[400 Bad Request: Reject Upload]
+    L1 -- Pass --> L2{Layer 2: MIME-Type Alignment}
+    L2 -- Mismatched MIME --> Reject
+    L2 -- Pass --> L3{Layer 3: Forensic Binary Check}
+    L3 -- Non-matching Magic Number / Binary Nulls --> Reject
+    L3 -- Pass --> Parse[Successful Parsing & Extraction]
+```
+
+* **Layer 1: Extension Verification:** Enforces strict whitelist validation. Only files ending with a lowercase `.pdf` or `.csv` extension are allowed.
+* **Layer 2: Client-Declared MIME-Type Alignment:** Cross-references the browser's declared HTTP `Content-Type` header (e.g. `application/pdf` or `text/csv`) with the target extension to catch basic header-spoofing attempts.
+* **Layer 3: Forensic Magic-Number & Binary Null Inspection:** Read and scan the raw file header (first `1024` bytes) directly:
+  * For **PDFs**, verifies the file starts with the official binary signature `%PDF` (Hex: `25 50 44 46`).
+  * For **CSVs**, blocks potential executable file signatures (e.g., Windows PE `MZ` or Linux `ELF` headers) and scans for binary null control characters (`\x00`), which represent compiled payload injection.
+
+### 2. Transparent Column-Level Cryptography (At-Rest)
+To protect confidential personal financial data, StatementX employs **transparent, symmetric column-level encryption** using **AES-256 (Fernet)**.
+
+* **Encrypted Columns:** All highly sensitive text fields (like transaction descriptions, annotations) and numeric fields (amounts, balances) are seamlessly encrypted using Python's `cryptography.fernet` package before committing to the SQLite/PostgreSQL storage layer, and decrypted on-the-fly when retrieved.
+* **Database Theft Mitigation:** Even if the underlying database file (`statementx.db` or PostgreSQL storage clusters) is compromised or leaked, the transaction data remains mathematically scrambled and unreadable without the symmetric `ENCRYPTION_KEY`.
+
+---
+
 ## 🚀 Local Installation & Setup
 
 Ensure you have **Python 3.10+** installed before proceeding.
@@ -75,8 +107,9 @@ Create a `.env` file in the root of the `fastapi_backend` directory (matching th
 ```ini
 GEMINI_API_KEY=your_gemini_api_key_here
 DATABASE_URL=sqlite:///./statementx.db
+ENCRYPTION_KEY=your_32_byte_urlsafe_base64_fernet_key
 ```
-> **Note:** If you wish to migrate to production PostgreSQL, verify the `postgresql-x64` service is running locally on your target machine and adjust the `DATABASE_URL` string: `postgresql://username:password@localhost:5432/statementx`
+> **Note:** If you wish to migrate to production PostgreSQL, verify the `postgresql-x64` service is running locally on your target machine and adjust the `DATABASE_URL` string: `postgresql://username:password@localhost:5432/statementx`. For local testing, if `ENCRYPTION_KEY` is omitted, the engine falls back to a stable cryptographic master seed.
 
 ### 4. Create Database Tables
 Initialize database tracking schemas:
@@ -93,12 +126,19 @@ Once the startup cycle is complete, access the interactive OpenAPI/Swagger docs 
 
 ---
 
-## 🧪 Running Integration Tests
-The backend is packaged with an End-to-End client simulation script that verifies the full database lifecycle, classification accuracy, insights aggregator, and chatbot services.
+## 🧪 Running Integration & Security Tests
+The backend is packaged with two simulation scripts to verify functional health and security boundaries.
 
-To execute the test:
+### 1. Functional E2E Integration Test
+Verifies the database lifecycle, classification accuracy, insights engine, and RAG chatbot services:
 ```bash
 python run_api_test.py
+```
+
+### 2. Security Exploit & Validation Test
+Verifies the ingestion validation engine, blocking of extension-spoofed scripts, and malicious binary rejection:
+```bash
+python test_security_exploit.py
 ```
 
 ---
