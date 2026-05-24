@@ -23,46 +23,6 @@ class TransactionsScreen extends StatefulWidget {
 class _TransactionsScreenState extends State<TransactionsScreen> {
   bool isLoadingInsights = false;
 
-  // Translation State
-  List<String> translatedDescriptions = [];
-  bool isTranslated = false;
-  bool isTranslating = false;
-
-  void _toggleLanguage() async {
-    if (isTranslated) {
-      setState(() => isTranslated = false);
-      return;
-    }
-
-    setState(() => isTranslating = true);
-
-    try {
-      // Collect descriptions for batch translation
-      List<String> descriptions = widget.transactions
-          .map((t) => t.narration)
-          .toList();
-
-      // Call batch translation (Hardcoded 'hi' for Hindi, change to dynamic as needed)
-      List<String> translated = await StatementService.translatePackedList(
-        items: descriptions,
-        targetLang: 'hi',
-      );
-
-      setState(() {
-        translatedDescriptions = translated;
-        isTranslated = true;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Translation failed: $e")));
-      }
-    } finally {
-      if (mounted) setState(() => isTranslating = false);
-    }
-  }
-
   Color getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'food':
@@ -81,11 +41,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Widget buildTransactionCard(Transaction txn, int index) {
     final category = txn.category ?? 'Others';
     final indicatorColor = getCategoryColor(category);
-    // Display translated text if available, otherwise original
-    final String displayText =
-        isTranslated && translatedDescriptions.length > index
-        ? translatedDescriptions[index]
-        : txn.narration;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -112,7 +67,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  displayText,
+                  txn.narration,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -230,17 +185,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              isTranslated
-                  ? Icons.g_translate_rounded
-                  : Icons.translate_rounded,
-              color: AppColors.primaryGreen,
-            ),
-            onPressed: isTranslating ? null : _toggleLanguage,
-          ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
