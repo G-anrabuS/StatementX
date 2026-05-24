@@ -9,7 +9,7 @@ from app.schemas.statements import (
     StatementExtractionResponse,
     TransactionItem,
     RawStatementExtractionResponse,
-    RawTransactionItem
+    RawTransactionItem,
 )
 from app.core.config import settings
 
@@ -19,58 +19,82 @@ class BankExtractorService:
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def execute_semantic_parse(
-        self, document_bytes: bytes
+        self, document_bytes: bytes, password: str = None
     ) -> RawStatementExtractionResponse:
         """
-        Parses bank statement PDFs. If a document exceeds 5 pages, it is automatically
-        partitioned into 5-page segments, processed in parallel asynchronously,
-        and consolidated to avoid token context bloat and speed up processing.
+        Parses bank statement PDFs. If a document is encrypted, it is unlocked via
+        the provided password. If it exceeds 5 pages, it is automatically partitioned
+        into 5-page segments, processed in parallel asynchronously, and consolidated.
         """
-        # Count PDF pages in memory using pypdf
         try:
             reader = PdfReader(io.BytesIO(document_bytes))
+
+            # 1. Check if the PDF file is password protected (encrypted)
+            if reader.is_encrypted:
+                if not password:
+                    # Signal the API layer that a password must be requested from the user
+                    raise ValueError("PASSWORD_REQUIRED")
+
+                # Try to decrypt using the user-provided password
+                decrypt_success = reader.decrypt(password)
+                if decrypt_success == 0:  # 0 indicates password failure in pypdf
+                    raise ValueError("INVALID_PASSWORD")
+
             num_pages = len(reader.pages)
+        except ValueError:
+            # Re-raise explicit password validation requirements up to the API route handler
+            raise
         except Exception as e:
-            # Fallback to standard parse if reader fails (corrupt metadata etc)
+            # Fallback to standard parse if reader fails on page reading due to other reasons
             return await self._parse_chunk(document_bytes)
 
         # Standard processing if PDF is small (5 pages or fewer)
         if num_pages <= 5:
+            # If encrypted and unlocked, we must re-build the safe bytes representation
+            # from our authenticated 'reader' state so downstream parsers can read it cleanly.
+            if reader.is_encrypted:
+                writer = PdfWriter()
+                for page in reader.pages:
+                    writer.add_page(page)
+                decrypted_io = io.BytesIO()
+                writer.write(decrypted_io)
+                document_bytes = decrypted_io.getvalue()
+
             return await self._parse_chunk(document_bytes)
 
         # Chunk the PDF in segments of 5 pages
         chunk_size = 5
         tasks = []
-        
+
         for start_idx in range(0, num_pages, chunk_size):
             end_idx = min(start_idx + chunk_size, num_pages)
             writer = PdfWriter()
             for page_num in range(start_idx, end_idx):
                 writer.add_page(reader.pages[page_num])
-                
+
             chunk_io = io.BytesIO()
             writer.write(chunk_io)
             chunk_bytes = chunk_io.getvalue()
-            
-            # Append parsing task
+
+            # Append parsing task (unlocked chunk slices don't contain parent password overhead)
             tasks.append(self._parse_chunk(chunk_bytes))
-            
+
         # Run all chunk parsing tasks concurrently in parallel
         chunk_responses = await asyncio.gather(*tasks)
 
         # Consolidate results
         consolidated_transactions: List[RawTransactionItem] = []
         bank_name = "Imported PDF Statement"
-        
+
         for idx, resp in enumerate(chunk_responses):
             if idx == 0:
                 bank_name = resp.bank_name
             consolidated_transactions.extend(resp.transactions)
-            
+
         return RawStatementExtractionResponse(
             bank_name=bank_name,
             total_transactions=len(consolidated_transactions),
-            transactions=consolidated_transactions
+            transactions=consolidated_transactions,
         )
 
     async def _parse_chunk(self, chunk_bytes: bytes) -> RawStatementExtractionResponse:
@@ -111,7 +135,7 @@ class BankExtractorService:
                     response_schema=RawStatementExtractionResponse,
                     temperature=0.1,  # Low temperature ensures high reliability, non-creative accuracy
                 ),
-            )
+            ),
         )
 
         # Hydrate JSON back cleanly directly into validated typing structures

@@ -1,15 +1,19 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 from app.models.statement import Statement
-from app.schemas.insights import StatementInsightsResponse, AICoachResponse, ChatRequest, ChatResponse
+from app.schemas.insights import (
+    StatementInsightsResponse,
+    AICoachResponse,
+    ChatRequest,
+    ChatResponse,
+)
 from app.schemas.visualization import VisualizationResponse
 from app.services.insights_service import InsightsService
 from app.services.chatbot_service import ChatbotService
 from app.services.visualization_service import VisualizationService
 from app.services.pdf_service import PDFReportService
-
 
 
 from app.schemas.statements import (
@@ -91,13 +95,11 @@ def enrich_transactions(db: Session, transactions):
 @router.post("/extract", response_model=StatementExtractionResponse)
 async def extract_statement(
     file: UploadFile = File(...),
+    password: str = Form(None),  # <-- Add optional form parameter for password
     db: Session = Depends(get_db),
 ):
     if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="No file uploaded",
-        )
+        raise HTTPException(status_code=400, detail="No file uploaded")
 
     filename_lower = file.filename.lower()
     is_pdf = filename_lower.endswith(".pdf")
@@ -105,8 +107,7 @@ async def extract_statement(
 
     if not (is_pdf or is_csv):
         raise HTTPException(
-            status_code=400,
-            detail="Only PDF and CSV files are allowed",
+            status_code=400, detail="Only PDF and CSV files are allowed"
         )
 
     try:
@@ -118,12 +119,12 @@ async def extract_statement(
                 filename=file.filename,
             )
         else:
-            parsed_result = await extractor.execute_semantic_parse(file_bytes)
+            # Pass the password field directly to your extractor service
+            parsed_result = await extractor.execute_semantic_parse(
+                file_bytes, password=password
+            )
 
-        enriched_transactions = enrich_transactions(
-            db,
-            parsed_result.transactions,
-        )
+        enriched_transactions = enrich_transactions(db, parsed_result.transactions)
 
         extracted_result = StatementExtractionResponse(
             bank_name=parsed_result.bank_name,
@@ -139,6 +140,16 @@ async def extract_statement(
 
         extracted_result.statement_id = str(statement_record.statement_id)
         return extracted_result
+
+    # Catch specific password exceptions thrown from the extractor service
+    except ValueError as val_err:
+        err_msg = str(val_err).lower()
+        if "password required" in err_msg:
+            raise HTTPException(status_code=401, detail="PASSWORD_REQUIRED")
+        elif "invalid password" in err_msg:
+            raise HTTPException(status_code=401, detail="INVALID_PASSWORD")
+
+        raise HTTPException(status_code=400, detail=str(val_err))
 
     except Exception as e:
         raise HTTPException(
@@ -175,7 +186,9 @@ async def get_statement_insights(
     for a specific statement ID.
     """
     try:
-        insights = await InsightsService.generate_statement_insights(db, statement_id, include_ai_coach=False)
+        insights = await InsightsService.generate_statement_insights(
+            db, statement_id, include_ai_coach=False
+        )
         return insights
     except Exception as e:
         raise HTTPException(
@@ -194,7 +207,9 @@ async def get_statement_ai_coach(
     (narrative coach analysis and structured prioritized actions) for a specific statement ID.
     """
     try:
-        insights = await InsightsService.generate_statement_insights(db, statement_id, include_ai_coach=True)
+        insights = await InsightsService.generate_statement_insights(
+            db, statement_id, include_ai_coach=True
+        )
         return AICoachResponse(
             summary=insights.ai_summary,
             recommendations=insights.ai_recommendations,
@@ -221,7 +236,7 @@ async def chat_with_statement(
             db=db,
             statement_id=statement_id,
             message=payload.message,
-            chat_history=payload.chat_history
+            chat_history=payload.chat_history,
         )
         return ChatResponse(response=reply, sources=sources)
     except Exception as e:
@@ -267,14 +282,14 @@ async def export_statement_pdf_report(
     """
     try:
         pdf_buffer = PDFReportService.generate_pdf_report(db, statement_id)
-        
+
         # Build clean formatted filename
         filename = f"StatementX_Analysis_{statement_id[:8]}.pdf"
-        
+
         return StreamingResponse(
             pdf_buffer,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
     except ValueError as val_err:
         raise HTTPException(
@@ -286,8 +301,3 @@ async def export_statement_pdf_report(
             status_code=500,
             detail=f"PDF report generation engine failure: {str(e)}",
         )
-
-
-
-
-

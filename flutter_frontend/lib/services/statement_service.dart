@@ -16,17 +16,22 @@ class StatementService {
   }
 
   /// POST /api/statements/extract
-  /// Standard pipeline layer to upload and parse PDF/CSV bank statement records
   static Future<StatementResponse> uploadStatement(
     String fileName,
-    Uint8List fileBytes,
-  ) async {
+    Uint8List fileBytes, {
+    String? password, // <-- Add optional named parameter
+  }) async {
     final uri = Uri.parse('$baseUrl/extract');
     final request = http.MultipartRequest('POST', uri);
 
     request.files.add(
       http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
     );
+
+    // Attach password payload to fields if provided
+    if (password != null && password.isNotEmpty) {
+      request.fields['password'] = password;
+    }
 
     final streamedResponse = await request.send().timeout(
       const Duration(seconds: 120),
@@ -37,6 +42,12 @@ class StatementService {
     if (response.statusCode == 200) {
       final jsonData = jsonDecode(response.body);
       return StatementResponse.fromJson(jsonData);
+    }
+
+    // Catch password status signals from the backend
+    if (response.statusCode == 401) {
+      final errorDetail = jsonDecode(response.body)['detail'];
+      throw FormatException(errorDetail ?? 'PASSWORD_ERROR');
     }
 
     throw Exception('Upload failed: ${response.body}');

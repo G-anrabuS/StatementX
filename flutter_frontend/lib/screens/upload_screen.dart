@@ -36,30 +36,150 @@ class _UploadScreenState extends State<UploadScreen> {
       errorMessage = null;
     });
 
-    try {
-      final response = await StatementService.uploadStatement(
-        file.name,
-        file.bytes!,
-      );
-      if (!mounted) return;
+    String? currentPassword;
+    bool isFinished = false;
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => TransactionsScreen(
-            transactions: response.transactions,
-            bankName: response.bankName,
-            statementId: response.statementId,
+    // This loop keeps the workflow active until successfully parsed or explicitly cancelled
+    while (!isFinished) {
+      try {
+        final response = await StatementService.uploadStatement(
+          file.name,
+          file.bytes!,
+          password: currentPassword, // Passes null on the first loop attempt
+        );
+
+        if (!mounted) return;
+        isFinished = true; // Breaks execution loop safely on success
+
+        // Safe screen routing to the transaction layout ledger
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TransactionsScreen(
+              transactions: response.transactions,
+              bankName: response.bankName,
+              statementId: response.statementId,
+            ),
           ),
-        ),
-      );
-    } catch (e) {
-      setState(() => errorMessage = e.toString());
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
+        );
+      } on FormatException catch (ex) {
+        // CRITICAL FIX: Intercept password requirements cleanly
+        if (ex.message == 'PASSWORD_REQUIRED' ||
+            ex.message == 'INVALID_PASSWORD') {
+          setState(() {
+            isLoading = false;
+            errorMessage =
+                null; // Clear any old errors to allow a clean retry state
+          });
+
+          // Fire open the interactive password text field dialog modal
+          final userPasswordInput = await _showPasswordDialog(
+            isRetry: ex.message == 'INVALID_PASSWORD',
+          );
+
+          // Terminate gracefully if the user exits out or submits empty spaces
+          if (userPasswordInput == null || userPasswordInput.trim().isEmpty) {
+            setState(() {
+              errorMessage = 'Parsing canceled: Password required.';
+              isLoading = false;
+            });
+            isFinished = true; // Break loop explicitly
+            return;
+          }
+
+          // Cache the captured string input and restart the loading layout state for the next loop run
+          currentPassword = userPasswordInput;
+          setState(() => isLoading = true);
+
+          // Continue loop immediately with the newly acquired password context
+          continue;
+        } else {
+          setState(() => errorMessage = ex.message);
+          isFinished = true;
+        }
+      } catch (e) {
+        // Fallback generic catch statement handling system crashes or server drops
+        // Clean up text if it contains raw instance wrappers
+        String errorText = e.toString();
+        if (errorText.contains('PASSWORD_REQUIRED') ||
+            errorText.contains('INVALID_PASSWORD')) {
+          // Fallback parsing manual extraction override if exception type leaked into generic catch
+          setState(() => isLoading = false);
+          final userPasswordInput = await _showPasswordDialog(
+            isRetry: errorText.contains('INVALID_PASSWORD'),
+          );
+          if (userPasswordInput == null || userPasswordInput.trim().isEmpty) {
+            setState(
+              () => errorMessage = 'Parsing canceled: Password required.',
+            );
+            isFinished = true;
+            return;
+          }
+          currentPassword = userPasswordInput;
+          setState(() => isLoading = true);
+          continue;
+        }
+
+        setState(
+          () => errorMessage = errorText.replaceFirst('Exception: ', ''),
+        );
+        isFinished = true;
+      } finally {
+        if (isFinished && mounted) {
+          setState(() => isLoading = false);
+        }
+      }
     }
+  }
+
+  Future<String?> _showPasswordDialog({bool isRetry = false}) async {
+    String enteredPassword = '';
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false, // User must submit or explicitly cancel
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            isRetry ? 'Incorrect Password' : 'Password Protected PDF',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isRetry
+                    ? 'The password entered was invalid. Please try again:'
+                    : 'This statement file is encrypted. Enter the password to unlock it:',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                obscureText: true,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Document Password',
+                  hintText: 'Enter PDF password',
+                  border: const OutlineInputBorder(),
+                  errorText: isRetry ? 'Invalid password' : null,
+                ),
+                onChanged: (value) => enteredPassword = value,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(context, null), // Returns null on Cancel
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, enteredPassword),
+              child: const Text('UNLOCK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget featureCard(
@@ -228,7 +348,7 @@ class _UploadScreenState extends State<UploadScreen> {
             ),
           ],
         ),
-        SizedBox(height: isMobile ? 14 : 24), // Dynamic optimization variables
+        SizedBox(height: isMobile ? 14 : 24),
         Column(
           crossAxisAlignment: isMobile
               ? CrossAxisAlignment.center
@@ -238,9 +358,7 @@ class _UploadScreenState extends State<UploadScreen> {
               'BANK STATEMENT',
               textAlign: isMobile ? TextAlign.center : TextAlign.start,
               style: TextStyle(
-                fontSize: isMobile
-                    ? 26
-                    : 46, // Scaled down title dynamically from 54 to 46 for safe desktop boundaries
+                fontSize: isMobile ? 26 : 46,
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w900,
                 height: 1.1,
@@ -255,9 +373,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 'ANALYSER',
                 textAlign: isMobile ? TextAlign.center : TextAlign.start,
                 style: TextStyle(
-                  fontSize: isMobile
-                      ? 30
-                      : 52, // Scaled down from 60 to 52 for tight desktop window parameters
+                  fontSize: isMobile ? 30 : 52,
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
                   height: 1.1,
@@ -327,7 +443,6 @@ class _UploadScreenState extends State<UploadScreen> {
           style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
         ),
         SizedBox(height: isMobile ? 16 : 24),
-
         if (isMobile)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -370,7 +485,6 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
             ],
           ),
-
         if (errorMessage != null) ...[
           const SizedBox(height: 10),
           Text(
@@ -412,9 +526,7 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Widget buildIllustration(bool isMobile) {
-    final canvasSize = isMobile
-        ? 140.0
-        : 280.0; // Scaled down dashboard display slightly from 340 to 280 for desktop stability
+    final canvasSize = isMobile ? 140.0 : 280.0;
 
     return Center(
       child: Container(
