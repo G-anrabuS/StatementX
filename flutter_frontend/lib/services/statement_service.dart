@@ -1,13 +1,47 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:html' as html; // Need to handle web specific download
 import '../models/statement_model.dart';
 import '../models/insights_model.dart';
 import '../models/visualization_model.dart';
 import 'auth_service.dart';
 
 class StatementService {
+  // ... rest of class
+
+  static Future<void> exportStatementPdf(String statementId) async {
+    final url = Uri.parse('$baseUrl/$statementId/export-pdf');
+    final response = await http.get(url, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      final bytes = response.bodyBytes;
+      final fileName = 'StatementX_Analysis_$statementId.pdf';
+
+      if (kIsWeb) {
+        // Web: Create an anchor element and trigger download
+        final blob = html.Blob([bytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", fileName)
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      } else {
+        // Mobile: Save to temp directory and open
+        final directory = await getTemporaryDirectory();
+        final file = File('${directory.path}/$fileName');
+        await file.writeAsBytes(bytes);
+        await OpenFile.open(file.path);
+      }
+    } else {
+      throw Exception('Failed to export PDF: ${response.body}');
+    }
+  }
   // Configures local device bridge address transparently
   static String get baseUrl {
     if (defaultTargetPlatform == TargetPlatform.android && !kIsWeb) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/insights_model.dart';
 import '../theme/app_theme.dart';
+import '../services/statement_service.dart';
 // Import the new intelligence screen layers
 import 'visualization_screen.dart';
 import 'ai_coach_screen.dart';
@@ -25,6 +26,34 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
+  bool _isExporting = false;
+
+  Future<void> _handleDownloadPdf() async {
+    setState(() => _isExporting = true);
+    try {
+      await StatementService.exportStatementPdf(widget.statementId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PDF Report downloaded successfully!'),
+            backgroundColor: AppColors.primaryGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to download PDF: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
   Color getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'food':
@@ -521,6 +550,26 @@ class _InsightsScreenState extends State<InsightsScreen> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          if (_isExporting)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.only(right: 16.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.redAccent),
+              tooltip: 'Export Analysis to PDF',
+              onPressed: _handleDownloadPdf,
+            ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
