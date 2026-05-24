@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 
 class InsightsService:
     @staticmethod
-    async def generate_statement_insights(db: Session, statement_id: str) -> StatementInsightsResponse:
+    async def generate_statement_insights(db: Session, statement_id: str, include_ai_coach: bool = False) -> StatementInsightsResponse:
         """
         Processes database records for a specific statement to calculate aggregates,
         identify recurring subscriptions, flag potential transaction anomalies, and
-        generate AI-powered cash flow summaries and recommendations.
+        optionally generate AI-powered cash flow summaries and recommendations.
         """
         # 1. Fetch transactions chronologically
         transactions = (
@@ -84,20 +84,24 @@ class InsightsService:
         # 4. Detect Unusual Transactions (Anomalies)
         anomalies = InsightsService._detect_anomalies(debit_transactions, debit_amounts)
 
+        ai_summary = ""
+        ai_recommendations = []
+
         # 5. Persistent Caching & AI Generation Layer (Decoupled & Modularized)
-        ai_summary, ai_recommendations = await AICoachService.get_or_generate_coach_insights(
-            db=db,
-            statement_id=statement_id,
-            debit_transactions=debit_transactions,
-            total_income=total_income,
-            total_expense=total_expense,
-            net_savings=net_savings,
-            saving_rate=saving_rate,
-            highest_spending_category=highest_spending_category,
-            category_breakdown=category_breakdown,
-            subscriptions=subscriptions,
-            anomalies=anomalies
-        )
+        if include_ai_coach:
+            ai_summary, ai_recommendations = await AICoachService.get_or_generate_coach_insights(
+                db=db,
+                statement_id=statement_id,
+                debit_transactions=debit_transactions,
+                total_income=total_income,
+                total_expense=total_expense,
+                net_savings=net_savings,
+                saving_rate=saving_rate,
+                highest_spending_category=highest_spending_category,
+                category_breakdown=category_breakdown,
+                subscriptions=subscriptions,
+                anomalies=anomalies
+            )
 
         return StatementInsightsResponse(
             total_income=round(total_income, 2),

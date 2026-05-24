@@ -122,11 +122,81 @@ def run_test():
         print("\n=== SEMANTIC SEARCH SOURCES ===")
         for s in chat.get("sources", []):
             print(f"- [{s.get('date')}] {s.get('description')} (Similarity Match Score: {s.get('similarity')})")
+    except Exception as e:
+        print("[FAIL] POST /chat crashed:")
+        traceback.print_exc()
+        return
+
+    # 6. GET Visualization Endpoint
+    print(f"\n6. Testing GET /api/statements/{statement_id}/visualization ...")
+    try:
+        res = requests.get(f"{BASE_URL}/api/statements/{statement_id}/visualization")
+        print(f"Status Code: {res.status_code}")
+        if res.status_code != 200:
+            print(f"[FAIL] GET /visualization failed. Body: {res.text}")
+            return
+        
+        vis = res.json()
+        print("\n=== FINANCIAL HEALTH INDICATORS ===")
+        hi = vis.get("health_indicators", {})
+        print(f"Health Score:          {hi.get('health_score')}/100 ({hi.get('health_rating')})")
+        print(f"Savings Rate:          {hi.get('savings_rate')}%")
+        print(f"Burn Rate:             {hi.get('burn_rate')}%")
+        print(f"Discretionary Ratio:   {hi.get('discretionary_spend_ratio')}%")
+        print(f"Essential Ratio:       {hi.get('essential_spend_ratio')}%")
+        print(f"Liquidity Coverage:    {hi.get('liquidity_ratio')} months")
+        print(f"Avg Daily Expense:     INR {hi.get('average_daily_expense')}")
+        print(f"Savings Consistency:   {hi.get('savings_consistency')}%")
+
+        print("\n=== 50/30/20 BUDGET ANALYSIS ===")
+        ba = vis.get("budget_allocation", {})
+        print(f"Needs:                 INR {ba.get('needs_amount')} ({ba.get('needs_percentage')}%) vs Target: {ba.get('needs_target_percentage')}%")
+        print(f"Wants:                 INR {ba.get('wants_amount')} ({ba.get('wants_percentage')}%) vs Target: {ba.get('wants_target_percentage')}%")
+        print(f"Savings/Surplus:       INR {ba.get('savings_amount')} ({ba.get('savings_percentage')}%) vs Target: {ba.get('savings_target_percentage')}%")
+
+        print("\n=== CASH FLOW TIMELINE (DAILY TRENDS) ===")
+        timeline = vis.get("cash_flow_timeline", [])
+        for pt in timeline[:3]:
+            print(f"- {pt.get('date')}: Cumulative Income: INR {pt.get('cumulative_income')} | Cumulative Expense: INR {pt.get('cumulative_expense')} | Balance: INR {pt.get('balance')}")
+        if len(timeline) > 3:
+            print(f"... and {len(timeline) - 3} more days")
+
+        print("\n=== CATEGORY VISUAL METADATA ===")
+        for item in vis.get("category_breakdown", []):
+            print(f"- {item.get('category')}: INR {item.get('amount')} ({item.get('percentage')}%) | Color Token: {item.get('color')} | {item.get('transaction_count')} txns")
+
+        print("\n=== SPENDING ACTIVITY PATTERNS ===")
+        sp = vis.get("spending_pattern", {})
+        print(f"Weekday Spent:         INR {sp.get('weekday_total')} (Avg: INR {sp.get('weekday_average')} across {sp.get('weekday_count')} txns)")
+        print(f"Weekend Spent:         INR {sp.get('weekend_total')} (Avg: INR {sp.get('weekend_average')} across {sp.get('weekend_count')} txns)")
+
+    except Exception as e:
+        print("[FAIL] GET /visualization crashed:")
+        traceback.print_exc()
+        return
+
+    # 7. GET PDF Export Endpoint
+    print(f"\n7. Testing GET /api/statements/{statement_id}/export-pdf ...")
+    try:
+        res = requests.get(f"{BASE_URL}/api/statements/{statement_id}/export-pdf")
+        print(f"Status Code: {res.status_code}")
+        if res.status_code != 200:
+            print(f"[FAIL] GET /export-pdf failed. Body: {res.text}")
+            return
+        
+        # Save the PDF file to workspace to allow user visual review
+        pdf_path = "test_financial_report.pdf"
+        with open(pdf_path, "wb") as f:
+            f.write(res.content)
+            
+        print(f"[SUCCESS] Downloaded PDF Report successfully! Size: {len(res.content)} bytes.")
+        print(f"Report saved locally as: {pdf_path}")
+        
         print("\n==================================================")
         print("=== [SUCCESS] E2E INTEGRATION TEST COMPLETED!  ===")
         print("==================================================")
     except Exception as e:
-        print("[FAIL] POST /chat crashed:")
+        print("[FAIL] GET /export-pdf crashed:")
         traceback.print_exc()
 
 if __name__ == "__main__":

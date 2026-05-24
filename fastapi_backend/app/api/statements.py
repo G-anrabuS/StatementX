@@ -1,10 +1,14 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 from app.models.statement import Statement
 from app.schemas.insights import StatementInsightsResponse, AICoachResponse, ChatRequest, ChatResponse
+from app.schemas.visualization import VisualizationResponse
 from app.services.insights_service import InsightsService
 from app.services.chatbot_service import ChatbotService
+from app.services.visualization_service import VisualizationService
+from app.services.pdf_service import PDFReportService
 
 
 
@@ -171,7 +175,7 @@ async def get_statement_insights(
     for a specific statement ID.
     """
     try:
-        insights = await InsightsService.generate_statement_insights(db, statement_id)
+        insights = await InsightsService.generate_statement_insights(db, statement_id, include_ai_coach=False)
         return insights
     except Exception as e:
         raise HTTPException(
@@ -190,7 +194,7 @@ async def get_statement_ai_coach(
     (narrative coach analysis and structured prioritized actions) for a specific statement ID.
     """
     try:
-        insights = await InsightsService.generate_statement_insights(db, statement_id)
+        insights = await InsightsService.generate_statement_insights(db, statement_id, include_ai_coach=True)
         return AICoachResponse(
             summary=insights.ai_summary,
             recommendations=insights.ai_recommendations,
@@ -225,6 +229,65 @@ async def chat_with_statement(
             status_code=500,
             detail=f"Chatbot service failure: {str(e)}",
         )
+
+
+@router.get("/{statement_id}/visualization", response_model=VisualizationResponse)
+async def get_statement_visualization(
+    statement_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves personal finance intelligence, indicators, and charts visualization aggregates
+    (Cash Flow timeline, 50/30/20 budget framework, weekday/weekend distribution, category breakdown)
+    for a specific statement ID.
+    """
+    try:
+        data = VisualizationService.calculate_visualization_data(db, statement_id)
+        return data
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=404,
+            detail=str(val_err),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Visualization aggregator failure: {str(e)}",
+        )
+
+
+@router.get("/{statement_id}/export-pdf")
+async def export_statement_pdf_report(
+    statement_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Generates and exports a premium 5-page financial health assessment and transaction breakdown
+    PDF report for immediate download.
+    """
+    try:
+        pdf_buffer = PDFReportService.generate_pdf_report(db, statement_id)
+        
+        # Build clean formatted filename
+        filename = f"StatementX_Analysis_{statement_id[:8]}.pdf"
+        
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=404,
+            detail=str(val_err),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"PDF report generation engine failure: {str(e)}",
+        )
+
+
 
 
 

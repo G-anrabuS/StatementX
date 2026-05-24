@@ -60,9 +60,11 @@ class ChatbotService:
         top_txns = []
         top_thesis = []
         embedding_failed = False
+        scored_txns = []
+        scored_thesis = []
 
-        # 1. VECTOR SEARCH PIPELINE
-        if settings.GEMINI_API_KEY and not embedding_failed:
+        # 1. DENSE VECTOR SEARCH PIPELINE
+        if settings.GEMINI_API_KEY:
             try:
                 # 1a. Dynamic batch embedding for missing transaction vectors
                 unembedded = [t for t in transactions if t.embedding is None]
@@ -103,7 +105,6 @@ class ChatbotService:
                 query_arr = np.array(query_vector)
 
                 # 1c. Cosine Similarity Calculations on Transactions
-                scored_txns = []
                 for t in transactions:
                     if t.embedding is not None:
                         t_arr = np.array(t.embedding)
@@ -113,11 +114,7 @@ class ChatbotService:
                         similarity = dot_product / (norm_q * norm_t) if norm_q > 0 and norm_t > 0 else 0.0
                         scored_txns.append((t, float(similarity)))
 
-                scored_txns.sort(key=lambda x: x[1], reverse=True)
-                top_txns = scored_txns[:5]
-
                 # 1d. Cosine Similarity Calculations on Thesis Chunks
-                scored_thesis = []
                 for chunk in thesis_chunks:
                     if chunk.embedding is not None:
                         c_arr = np.array(chunk.embedding)
@@ -127,17 +124,45 @@ class ChatbotService:
                         similarity = dot_product / (norm_q * norm_c) if norm_q > 0 and norm_c > 0 else 0.0
                         scored_thesis.append((chunk, float(similarity)))
 
-                scored_thesis.sort(key=lambda x: x[1], reverse=True)
-                top_thesis = scored_thesis[:2]  # Pull top 2 highly relevant thesis paragraphs
-
             except Exception as vector_err:
                 logger.warning(f"Vector search failed (falling back to fuzzy keyword engine): {vector_err}")
                 embedding_failed = True
 
-        # 2. FUZZY LOCAL SEARCH PIPELINE (Pure-Python Resilient Fallback)
-        if embedding_failed or not top_txns:
-            top_txns = ChatbotService._fuzzy_semantic_search_txns(message, transactions)[:5]
-            top_thesis = ChatbotService._fuzzy_semantic_search_thesis(message, thesis_chunks)[:2]
+        # 2. SPARSE KEYWORD LOCAL SEARCH PIPELINE
+        fuzzy_txns = ChatbotService._fuzzy_semantic_search_txns(message, transactions)
+        fuzzy_thesis = ChatbotService._fuzzy_semantic_search_thesis(message, thesis_chunks)
+
+        # 3. HYBRID RAG RETRIEVAL FUSION LAYER (Dense Vector + Sparse Keyword Overlap)
+        hybrid_txns = []
+        vector_map = {t.transaction_id: score for t, score in scored_txns}
+        keyword_map = {t.transaction_id: score for t, score in fuzzy_txns}
+        
+        for t in transactions:
+            v_score = vector_map.get(t.transaction_id, 0.0)
+            k_score = keyword_map.get(t.transaction_id, 0.0)
+            
+            # Hybrid fusion scoring weight distribution:
+            # 60% Keyword overlap/exact matching to maintain absolute correctness on terms
+            # 40% Vector semantic similarity to discover contextual synonyms
+            h_score = (v_score * 0.40 + k_score * 0.60) if v_score > 0 else k_score
+            hybrid_txns.append((t, h_score))
+            
+        hybrid_txns.sort(key=lambda x: x[1], reverse=True)
+        top_txns = hybrid_txns[:5]
+
+        hybrid_thesis = []
+        vector_thesis_map = {c.chunk_id: score for c, score in scored_thesis}
+        keyword_thesis_map = {c.chunk_id: score for c, score in fuzzy_thesis}
+        
+        for c in thesis_chunks:
+            v_score = vector_thesis_map.get(c.chunk_id, 0.0)
+            k_score = keyword_thesis_map.get(c.chunk_id, 0.0)
+            
+            h_score = (v_score * 0.40 + k_score * 0.60) if v_score > 0 else k_score
+            hybrid_thesis.append((c, h_score))
+            
+        hybrid_thesis.sort(key=lambda x: x[1], reverse=True)
+        top_thesis = hybrid_thesis[:2]
 
         # 3. COMPILE CONTEXT SOURCES & NARRATIVES
         sources = []
@@ -178,24 +203,44 @@ class ChatbotService:
                     f"{chunk.content}\n"
                 )
 
-        # Calculate key statement aggregates for absolute accuracy
-        total_income = 0.0
-        total_expense = 0.0
-        for t in transactions:
-            total_income += float(t.credit or 0.0)
-            total_expense += float(t.debit or 0.0)
-        net_savings = total_income - total_expense
-        saving_rate = (net_savings / total_income * 100) if total_income > 0 else 0.0
+        # Fetch dynamic aggregates, category spending breakdowns, recurring subscription checks, anomalies, and AI coach recommendations
+        from app.services.insights_service import InsightsService
+        insights = await InsightsService.generate_statement_insights(db, statement_id, include_ai_coach=True)
 
-        global_insights_context = ""
-        if statement and isinstance(statement.raw_ai_output, dict):
-            cached_insights = statement.raw_ai_output.get("ai_insights")
-            if cached_insights and isinstance(cached_insights, dict):
-                cached_summary = cached_insights.get("summary", "")
-                global_insights_context = (
-                    f"### Global AI Coach Insights\n"
-                    f"{cached_summary}\n\n"
-                )
+        # 1. Format category breakdown context
+        category_breakdown_items = []
+        for cat, amt in insights.category_breakdown.items():
+            category_breakdown_items.append(f"- {cat}: INR {amt:.2f}")
+        category_breakdown_context = "\n".join(category_breakdown_items) if category_breakdown_items else "No categorized expenses."
+
+        # 2. Format subscriptions context
+        subscriptions_items = []
+        for sub in insights.subscriptions:
+            subscriptions_items.append(
+                f"- Vendor: {sub.vendor} | Average Amount: INR {sub.average_amount:.2f} | "
+                f"Frequency: {sub.frequency} | Last Transaction Date: {sub.last_transaction_date}"
+            )
+        subscriptions_context = "\n".join(subscriptions_items) if subscriptions_items else "No recurring subscriptions detected."
+
+        # 3. Format anomalies context
+        anomalies_items = []
+        for anom in insights.anomalies:
+            anomalies_items.append(
+                f"- [{anom.type}] {anom.date} | Amount: INR {anom.amount:.2f} | "
+                f"Narration: {anom.narration} | Reason: {anom.reason}"
+            )
+        anomalies_context = "\n".join(anomalies_items) if anomalies_items else "No unusual transaction anomalies flagged."
+
+        # 4. Format AI coach recommendations context
+        recs_items = []
+        for idx, rec in enumerate(insights.ai_recommendations, 1):
+            recs_items.append(
+                f"{idx}. Title: {rec.title}\n"
+                f"   Target Category: {rec.target_category} | Impact Tier: {rec.impact}\n"
+                f"   Description: {rec.description}\n"
+                f"   Actionable Goal: {rec.action_item}"
+            )
+        recommendations_context = "\n\n".join(recs_items) if recs_items else "No custom budget recommendations compiled yet."
 
         txn_grounding = "\n".join(txn_context_items) if txn_context_items else "No matching transactions found."
         thesis_grounding = "\n\n".join(thesis_context_items) if thesis_context_items else "No matching financial coach thesis sections found."
@@ -213,13 +258,29 @@ class ChatbotService:
 
         {history_context}### Statement High-Level Summary (Global Context)
         - Bank Name: {statement.bank_name if statement else "Unknown Bank"}
-        - Total Income (Deposits): INR {total_income:.2f}
-        - Total Expense (Withdrawals): INR {total_expense:.2f}
-        - Net Savings: INR {net_savings:.2f}
-        - Saving Rate: {saving_rate:.2f}%
+        - Total Income (Deposits): INR {insights.total_income:.2f}
+        - Total Expense (Withdrawals): INR {insights.total_expense:.2f}
+        - Net Savings: INR {insights.net_savings:.2f}
+        - Saving Rate: {insights.saving_rate:.2f}%
+        - Highest Spending Category: {insights.highest_spending_category}
         - Total Transactions: {len(transactions)}
 
-        {global_insights_context}### Section A: Semantically Retrieved Transactions (Raw Data)
+        ### Detailed Category Outflows Breakdown
+        {category_breakdown_context}
+
+        ### Detected Recurring Commitments (Subscriptions)
+        {subscriptions_context}
+
+        ### Flagged Transaction Anomalies (Risks)
+        {anomalies_context}
+
+        ### AI Financial Coach Summary Insight
+        {insights.ai_summary if insights.ai_summary else "No global coach summary has been compiled."}
+
+        ### Tactical AI Coach Prioritized Actions
+        {recommendations_context}
+
+        ### Section A: Semantically Retrieved Transactions (Raw Data)
         {txn_grounding}
 
         ### Section B: Semantically Retrieved Wealth Strategy Thesis Chunks
@@ -229,10 +290,10 @@ class ChatbotService:
         {message}
 
         ### Instructions
-        1. Synthesize your answer using BOTH the raw transaction logs in Section A, the overall statement summary, and the strategic thesis chunks in Section B.
+        1. Synthesize your answer using BOTH the raw transaction logs in Section A, the statement insights/aggregates, the AI coach summary & tactical action recommendations, and the strategic thesis chunks in Section B.
         2. Answer the user's specific query with extreme accuracy and rich financial intelligence.
-        3. If the user asks for high-level advice, behavioral analysis, expense optimizations, or tactical roadmap directions, ground your answer deeply in the wealth coach strategy (Section B) and Global Insights.
-        4. If the user asks about specific amounts, transactions, vendors, or dates, perform precise mathematical sums/filters of the debits and credits in Section A.
+        3. If the user asks for high-level advice, behavioral analysis, expense optimizations, or tactical roadmap directions, ground your response deeply in the strategic coaching framework (Section B), the overall aggregates, and the compiled AI Coach recommendations.
+        4. If the user asks about specific amounts, transactions, vendors, or dates, perform precise mathematical sums/filters of the debits and credits in Section A and verify against the category breakdown.
         5. Keep your response structured, friendly, and highly professional. Format money figures in INR (₹) or 'INR '.
         """
 
@@ -242,7 +303,7 @@ class ChatbotService:
             model_response = await loop.run_in_executor(
                 None,
                 lambda: client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.1-flash-lite",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         temperature=0.2,
@@ -252,7 +313,67 @@ class ChatbotService:
             response_text = model_response.text
         except Exception as gen_err:
             logger.error(f"Gemini chatbot answer generation failed: {gen_err}")
-            response_text = "I ran into an issue formulating my answer from the retrieved transactions. Please try again in a moment."
+            
+            # Resilient self-healing rule-based fallback engine
+            query_lower = message.lower()
+            
+            # Case 1: Subscription queries
+            if "subscription" in query_lower or "recurring" in query_lower or "netflix" in query_lower or "spotify" in query_lower or "youtube" in query_lower:
+                if insights.subscriptions:
+                    sub_list = []
+                    for sub in insights.subscriptions:
+                        sub_list.append(f"- **{sub.vendor}**: INR {sub.average_amount:.2f} ({sub.frequency}), last charge on {sub.last_transaction_date}")
+                    sub_text = "\n".join(sub_list)
+                    response_text = (
+                        f"Hello! I am StatementX-Bot. Although my AI generation connection is currently rate-limited, I analyzed your transaction logs and found the following active recurring subscriptions:\n\n"
+                        f"{sub_text}\n\n"
+                        f"If you don't utilize these services, consider canceling them to immediately boost your savings rate!"
+                    )
+                else:
+                    response_text = "Hello! I am StatementX-Bot. I analyzed your transaction logs and did not detect any recurring subscription charges."
+            
+            # Case 2: Anomalies / Security risk queries
+            elif "anomaly" in query_lower or "anomalies" in query_lower or "suspicious" in query_lower or "double" in query_lower or "duplicate" in query_lower:
+                if insights.anomalies:
+                    anom_list = []
+                    for anom in insights.anomalies:
+                        anom_list.append(f"- **{anom.date}**: INR {anom.amount:.2f} ({anom.narration}) - *{anom.reason}*")
+                    anom_text = "\n".join(anom_list)
+                    response_text = (
+                        f"Hello! I am StatementX-Bot. I reviewed your transactions and flagged these potential anomalies/security items:\n\n"
+                        f"{anom_text}\n\n"
+                        f"Please review these transactions carefully and contact your bank if there are any duplicate or unauthorized charges."
+                    )
+                else:
+                    response_text = "Hello! I am StatementX-Bot. Security scans found zero transaction anomalies in your statement."
+
+            # Case 3: Recommendations / Coach / Budgeting queries
+            elif "coach" in query_lower or "recommend" in query_lower or "recommendation" in query_lower or "action" in query_lower or "budget" in query_lower or "cut" in query_lower:
+                if insights.ai_recommendations:
+                    rec_list = []
+                    for idx, rec in enumerate(insights.ai_recommendations, 1):
+                        rec_list.append(f"{idx}. **{rec.title}** ({rec.impact} Impact)\n   *Action:* {rec.action_item}\n   *Details:* {rec.description}")
+                    rec_text = "\n\n".join(rec_list)
+                    response_text = (
+                        f"Hello! I am StatementX-Bot, your financial coach. Here is your prioritized budget optimization plan based on your statement's insights:\n\n"
+                        f"{rec_text}"
+                    )
+                else:
+                    response_text = "Hello! I am StatementX-Bot. I have no custom budget recommendations compiled yet."
+
+            # Case 4: General high-level summary fallback
+            else:
+                category_breakdown_str = ", ".join([f"{cat} (INR {amt:.2f})" for cat, amt in insights.category_breakdown.items()])
+                response_text = (
+                    f"Hello! I'm StatementX-Bot, your virtual financial analyst. My AI engine is currently experiencing Gemini API rate limits, but here is your precise financial ledger digest:\n\n"
+                    f"* **Bank Name:** {statement.bank_name if statement else 'Unknown Bank'}\n"
+                    f"* **Total Income:** INR {insights.total_income:.2f}\n"
+                    f"* **Total Expenses:** INR {insights.total_expense:.2f}\n"
+                    f"* **Net Savings:** INR {insights.net_savings:.2f} ({insights.saving_rate:.2f}% savings rate)\n"
+                    f"* **Highest Spending Category:** {insights.highest_spending_category}\n"
+                    f"* **Category breakdown:** {category_breakdown_str}\n\n"
+                    f"Feel free to ask me specifically about **'subscriptions'**, **'anomalies'**, or **'coach recommendations'** to see targeted reports!"
+                )
 
         return response_text, sources
 
