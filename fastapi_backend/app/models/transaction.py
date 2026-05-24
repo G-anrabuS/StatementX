@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import Column, String, Date, Numeric, Float, ForeignKey, Boolean
 from pgvector.sqlalchemy import Vector
-from app.core.database import Base, GUID
+from app.core.database import Base, GUID, EncryptedString, EncryptedNumeric
 
 
 class Transaction(Base):
@@ -21,17 +21,17 @@ class Transaction(Base):
 
     date = Column(Date, nullable=False)
 
-    raw_description = Column(String, nullable=False)
+    raw_description = Column(EncryptedString, nullable=False)
 
-    debit = Column(Numeric(12, 2), nullable=False)
+    debit = Column(EncryptedNumeric, nullable=False)
 
-    credit = Column(Numeric(12, 2), nullable=False)
+    credit = Column(EncryptedNumeric, nullable=False)
 
-    balance = Column(Numeric(12, 2), nullable=False)
+    balance = Column(EncryptedNumeric, nullable=False)
 
-    category = Column(String, nullable=True)
+    category = Column(EncryptedString, nullable=True)
 
-    sub_category = Column(String, nullable=True)
+    sub_category = Column(EncryptedString, nullable=True)
 
     confidence = Column(Float, nullable=True)
 

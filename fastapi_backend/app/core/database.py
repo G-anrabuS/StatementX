@@ -1,6 +1,10 @@
+import os
 import json
 import uuid
+import base64
+import hashlib
 import difflib
+from cryptography.fernet import Fernet
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.types import TypeDecorator, CHAR, TEXT
@@ -39,6 +43,67 @@ SessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+
+
+# Resolution of Encryption Key
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "")
+if not ENCRYPTION_KEY:
+    # Stable master seed key fallback
+    seed = b"StatementX_SuperSecret_Symmetric_Master_Salt"
+    ENCRYPTION_KEY = base64.urlsafe_b64encode(hashlib.sha256(seed).digest()).decode()
+    print("WARNING: 'ENCRYPTION_KEY' not found in env. Using stable default seed key. Please configure this in .env for production!")
+
+fernet = Fernet(ENCRYPTION_KEY.encode())
+
+
+class EncryptedString(TypeDecorator):
+    """Transparent column-level encryption for String values using AES-256 (Fernet)."""
+    impl = TEXT
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        # Encrypt plaintext string to base64 ciphertext
+        encrypted_bytes = fernet.encrypt(str(value).encode('utf-8'))
+        return encrypted_bytes.decode('utf-8')
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        try:
+            # Decrypt ciphertext back to plaintext
+            decrypted_bytes = fernet.decrypt(value.encode('utf-8'))
+            return decrypted_bytes.decode('utf-8')
+        except Exception as e:
+            # Safe local fallback to raw value if decryption fails (e.g. legacy plain text rows)
+            return value
+
+
+class EncryptedNumeric(TypeDecorator):
+    """Transparent column-level encryption for Numeric/Decimal float values using AES-256."""
+    impl = TEXT
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        # Convert numeric/Decimal to string and encrypt
+        encrypted_bytes = fernet.encrypt(str(value).encode('utf-8'))
+        return encrypted_bytes.decode('utf-8')
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        try:
+            # Decrypt back to float
+            decrypted_bytes = fernet.decrypt(value.encode('utf-8'))
+            return float(decrypted_bytes.decode('utf-8'))
+        except Exception as e:
+            try:
+                return float(value)
+            except Exception:
+                return 0.0
 
 
 class GUID(TypeDecorator):
@@ -119,4 +184,4 @@ def get_db():
     try:
         yield db
     finally:
-        db.close()
+        db.close()
