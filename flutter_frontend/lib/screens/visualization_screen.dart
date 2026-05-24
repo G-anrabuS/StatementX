@@ -33,7 +33,7 @@ class _VisualizationScreenState extends State<VisualizationScreen> {
       case 'excellent':
         return AppColors.primaryGreen;
       case 'good':
-        return AppColors.secondaryColor;
+        return AppColors.secondaryTeal;
       case 'fair':
         return const Color(0xFFE65100);
       default:
@@ -183,9 +183,9 @@ class _VisualizationScreenState extends State<VisualizationScreen> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: ratingColor.withOpacity(0.1),
+                  color: ratingColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: ratingColor.withOpacity(0.3)),
+                  border: Border.all(color: ratingColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   metrics.healthRating,

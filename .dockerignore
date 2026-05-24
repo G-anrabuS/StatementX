@@ -1,0 +1,50 @@
+# Version Control & IDEs
+.git
+.gitignore
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Python Ignore
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+**/.mypy_cache/
+fastapi_backend/.venv/
+fastapi_backend/venv/
+fastapi_backend/env/
+.venv/
+venv/
+env/
+
+# Flutter & Dart Ignore
+flutter_frontend/.dart_tool/
+flutter_frontend/.packages
+flutter_frontend/.pub-cache/
+flutter_frontend/.pub/
+flutter_frontend/build/
+flutter_frontend/web/index.html.tmp
+flutter_frontend/**/*.g.dart
+*.log
+
+# Databases & Local Secrets
+fastapi_backend/*.db
+fastapi_backend/*.db-journal
+*.db
+*.db-journal
+.env
+.env.local
+.env.production
+fastapi_backend/.env
+
+# Large Assets / Model Caches
+fastapi_backend/onnx_model/
+**/onnx_model/
+.cache/
+.huggingface/

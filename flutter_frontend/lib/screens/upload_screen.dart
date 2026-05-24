@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../models/statement_model.dart';
 import '../services/statement_service.dart';
 import '../theme/app_theme.dart';
 import 'transaction_screen.dart';
@@ -181,7 +182,68 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-
+  Widget featureCard(
+    IconData icon,
+    String title,
+    String subtitle,
+    bool isMobile,
+  ) {
+    return Container(
+      width: isMobile ? double.infinity : 200, // Balanced tracking dimensions
+      padding: EdgeInsets.all(isMobile ? 12 : 14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: isMobile ? 18 : 20,
+            backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.1),
+            child: Icon(
+              icon,
+              color: AppColors.primaryGreen,
+              size: isMobile ? 18 : 20,
+            ),
+          ),
+          SizedBox(width: isMobile ? 10 : 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 14 : 14,
+                  ),
+                ),
+                SizedBox(height: isMobile ? 2 : 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: isMobile ? 11 : 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -190,73 +252,43 @@ class _UploadScreenState extends State<UploadScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bgLight,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
-        titleSpacing: 0,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.primaryColor.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.analytics_rounded,
-                color: AppColors.primaryColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 10),
-            RichText(
-              text: const TextSpan(
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                children: [
-                  TextSpan(
-                    text: 'Statement',
-                    style: TextStyle(color: AppColors.textPrimary),
-                  ),
-                  TextSpan(
-                    text: 'X',
-                    style: TextStyle(color: AppColors.secondaryColor),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             return Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: 1100,
+                  maxWidth: 1280,
                   maxHeight: constraints.maxHeight,
                 ),
-                child: Padding(
+                child: Container(
+                  margin: EdgeInsets.all(isMobile ? 16 : 24),
                   padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 24 : 48,
-                    vertical: isMobile ? 24 : 48,
+                    horizontal: isMobile
+                        ? 20
+                        : 45, // Optimized layout container margins
+                    vertical: isMobile ? 24 : 36,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: AppColors.borderLight),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: isMobile
-                      ? SingleChildScrollView(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              buildLeftSection(isMobile),
-                              const SizedBox(height: 40),
-                              buildIllustration(isMobile),
-                            ],
-                          ),
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            buildLeftSection(isMobile),
+                            buildIllustration(isMobile),
+                          ],
                         )
                       : Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
@@ -265,7 +297,7 @@ class _UploadScreenState extends State<UploadScreen> {
                               flex: 5,
                               child: buildLeftSection(isMobile),
                             ),
-                            const SizedBox(width: 48),
+                            const SizedBox(width: 30),
                             Flexible(
                               flex: 4,
                               child: buildIllustration(isMobile),
@@ -288,6 +320,35 @@ class _UploadScreenState extends State<UploadScreen> {
           ? CrossAxisAlignment.center
           : CrossAxisAlignment.start,
       children: [
+        Row(
+          mainAxisAlignment: isMobile
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.analytics_rounded,
+              size: 36,
+              color: AppColors.primaryGreen,
+            ),
+            const SizedBox(width: 10),
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                children: [
+                  TextSpan(
+                    text: 'Statement',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                  TextSpan(
+                    text: 'X',
+                    style: TextStyle(color: AppColors.secondaryTeal),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isMobile ? 14 : 24),
         Column(
           crossAxisAlignment: isMobile
               ? CrossAxisAlignment.center
@@ -306,7 +367,7 @@ class _UploadScreenState extends State<UploadScreen> {
             ),
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [AppColors.primaryColor, AppColors.secondaryColor],
+                colors: [AppColors.primaryGreen, AppColors.secondaryTeal],
               ).createShader(bounds),
               child: Text(
                 'ANALYSER',
@@ -337,11 +398,11 @@ class _UploadScreenState extends State<UploadScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             gradient: const LinearGradient(
-              colors: [AppColors.primaryColor, AppColors.secondaryColor],
+              colors: [AppColors.primaryGreen, AppColors.secondaryTeal],
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryColor.withOpacity(0.15),
+                color: AppColors.primaryGreen.withValues(alpha: 0.15),
                 blurRadius: 16,
                 offset: const Offset(0, 6),
               ),
@@ -381,15 +442,58 @@ class _UploadScreenState extends State<UploadScreen> {
           'Supports PDF and CSV files',
           style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
         ),
+        SizedBox(height: isMobile ? 16 : 24),
+        if (isMobile)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: featureCard(
+                  Icons.psychology_rounded,
+                  'AI-Powered',
+                  'Smart Run',
+                  true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: featureCard(
+                  Icons.bar_chart_rounded,
+                  'Insights',
+                  'Reports',
+                  true,
+                ),
+              ),
+            ],
+          )
+        else
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              featureCard(
+                Icons.psychology_rounded,
+                'AI-Powered',
+                'Smart Analysis',
+                false,
+              ),
+              featureCard(
+                Icons.bar_chart_rounded,
+                'Insights',
+                'Clear Reports',
+                false,
+              ),
+            ],
+          ),
         if (errorMessage != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Text(
             errorMessage!,
             style: const TextStyle(color: Colors.redAccent, fontSize: 12),
           ),
         ],
         if (isLoading) ...[
-          SizedBox(height: isMobile ? 16 : 24),
+          SizedBox(height: isMobile ? 12 : 18),
           Row(
             mainAxisAlignment: isMobile
                 ? MainAxisAlignment.center
@@ -401,7 +505,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 child: CircularProgressIndicator(
                   strokeWidth: 2.0,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    AppColors.primaryColor,
+                    AppColors.primaryGreen,
                   ),
                 ),
               ),
@@ -432,7 +536,7 @@ class _UploadScreenState extends State<UploadScreen> {
           shape: BoxShape.circle,
           gradient: RadialGradient(
             colors: [
-              AppColors.primaryColor.withOpacity(0.04),
+              AppColors.primaryGreen.withValues(alpha: 0.04),
               Colors.transparent,
             ],
           ),
@@ -449,7 +553,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 border: Border.all(color: AppColors.borderLight),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.01),
+                    color: Colors.black.withValues(alpha: 0.01),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -463,7 +567,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       width: isMobile ? 50 : 90,
                       height: isMobile ? 5 : 8,
                       decoration: BoxDecoration(
-                        color: AppColors.secondaryColor.withOpacity(0.25),
+                        color: AppColors.secondaryTeal.withValues(alpha: 0.25),
                         borderRadius: BorderRadius.circular(20),
                       ),
                     ),
@@ -511,7 +615,7 @@ class _UploadScreenState extends State<UploadScreen> {
       width: isMobile ? 8 : 14,
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.primaryColor.withOpacity(0.6),
+        color: AppColors.primaryGreen.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(6),
       ),
     );

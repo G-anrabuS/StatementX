@@ -1,31 +1,18 @@
 # ==============================================================================
-# Multi-Stage Flutter Web Build and Serve Production Configuration
+# Optimized Production Dockerfile for StatementX Flutter Web Frontend
+# Pre-built copy approach: Saves 4.5GB of build disk space on EC2 servers!
 # ==============================================================================
 
-# Stage 1: Compile Flutter Web Static Assets
-FROM ghcr.io/cirruslabs/flutter:stable AS builder
+FROM nginx:stable-alpine AS runner
 
-WORKDIR /app
+# Remove the default nginx homepage assets
+RUN rm -rf /usr/share/nginx/html/*
 
-# Copy dependency specifications
-COPY pubspec.yaml pubspec.lock ./
+# Copy pre-compiled Flutter web assets from local build context
+COPY build/web /usr/share/nginx/html
 
-# Pre-fetch flutter web packages
-RUN flutter pub get
-
-# Copy frontend source files
-COPY . .
-
-# Build Flutter Web in Release Mode
-RUN flutter build web --release
-
-# Stage 2: Serve compiled assets using lightweight Nginx
-FROM nginx:stable-alpine
-
-# Copy built artifacts from the compiler stage
-COPY --from=builder /app/build/web /usr/share/nginx/html
-
-# Expose HTTP port 80 inside the network
+# Expose HTTP port
 EXPOSE 80
 
+# Run nginx in foreground mode
 CMD ["nginx", "-g", "daemon off;"]

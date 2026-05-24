@@ -13,7 +13,7 @@ flutter_frontend/.dart_tool/
 flutter_frontend/.packages
 flutter_frontend/.pub-cache/
 flutter_frontend/.pub/
-flutter_frontend/build/
+# flutter_frontend/build/
 flutter_frontend/android/.gradle/
 flutter_frontend/android/app/local.properties
 flutter_frontend/ios/.symlinks/

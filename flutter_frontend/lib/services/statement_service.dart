@@ -1,48 +1,17 @@
 import 'dart:convert';
-import 'dart:typed_data';
-import 'dart:io' show File;
+import 'dart:io' as io;
+import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'dart:html' as html; // Need to handle web specific download
 import '../models/statement_model.dart';
 import '../models/insights_model.dart';
-import '../models/visualization_model.dart';
+import '../models/visualization_model.dart'; // Ensure your visualization response models are located here
 import 'auth_service.dart';
 
 class StatementService {
-  // ... rest of class
-
-  static Future<void> exportStatementPdf(String statementId) async {
-    final url = Uri.parse('$baseUrl/$statementId/export-pdf');
-    final response = await http.get(url, headers: await _getHeaders());
-
-    if (response.statusCode == 200) {
-      final bytes = response.bodyBytes;
-      final fileName = 'StatementX_Analysis_$statementId.pdf';
-
-      if (kIsWeb) {
-        // Web: Create an anchor element and trigger download
-        final blob = html.Blob([bytes], 'application/pdf');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
-          ..setAttribute("download", fileName)
-          ..click();
-        html.Url.revokeObjectUrl(url);
-      } else {
-        // Mobile: Save to temp directory and open
-        final directory = await getTemporaryDirectory();
-        final file = File('${directory.path}/$fileName');
-        await file.writeAsBytes(bytes);
-        await OpenFile.open(file.path);
-      }
-    } else {
-      throw Exception('Failed to export PDF: ${response.body}');
-    }
-  }
-  // Configures local device bridge address transparently
+  // Configures local device bridge address transparently when deployed to Android Emulators
   static String get baseUrl {
     if (kIsWeb) {
       return '${Uri.base.origin}/api/statements';
@@ -53,99 +22,20 @@ class StatementService {
     return 'http://127.0.0.1:8000/api/statements';
   }
 
-  static Future<Map<String, String>> _getHeaders() async {
-    final token = await AuthService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  /// Optimized Batch Translation using HTML Packing
-  /// Sends a list of strings wrapped in HTML to the backend for single-trip processing.
-  static Future<List<String>> translatePackedList({
-    required List<String> items,
-    required String targetLang,
-  }) async {
-    if (items.isEmpty) return [];
-
-    // 1. PACKING STAGE: Wrap individual elements inside unique tracking tags
-    final htmlBuffer = StringBuffer();
-    for (int i = 0; i < items.length; i++) {
-      String cleanText = items[i]
-          .replaceAll('&', '&amp;')
-          .replaceAll('<', '&lt;')
-          .replaceAll('>', '&gt;');
-      htmlBuffer.write('<p id="$i">$cleanText</p>');
-    }
-
-    // Direct path to the /translate/html endpoint (removing the /statements prefix)
-    final url = Uri.parse(
-      baseUrl.replaceAll('/api/statements', '/api/translate/html'),
-    );
-
-    try {
-      final response = await http.post(
-        url,
-        headers: await _getHeaders(),
-        body: jsonEncode({
-          'html_content': htmlBuffer.toString(),
-          'target_lang': targetLang,
-          'source_lang': 'auto',
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        String translatedHtml = data['translated_html'] ?? '';
-
-        // 2. UNPACKING STAGE: Reconstruct the collection using Regex
-        final exp = RegExp(
-          r'<p id="\d+">(.*?)</p>',
-          caseSensitive: false,
-          dotAll: true,
-        );
-        final matches = exp.allMatches(translatedHtml);
-
-        List<String> results = [];
-        for (final match in matches) {
-          String decodedValue = match.group(1) ?? '';
-          decodedValue = decodedValue
-              .replaceAll('&amp;', '&')
-              .replaceAll('&lt;', '<')
-              .replaceAll('&gt;', '>');
-          results.add(decodedValue.trim());
-        }
-
-        return results.length == items.length ? results : items;
-      } else {
-        throw Exception(
-          'Server rejected packed payload: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('HTML packing pipeline error: $e');
-    }
-  }
-
+  /// POST /api/statements/extract
   static Future<StatementResponse> uploadStatement(
     String fileName,
     Uint8List fileBytes, {
-    String? password,
+    String? password, // <-- Add optional named parameter
   }) async {
     final uri = Uri.parse('$baseUrl/extract');
     final request = http.MultipartRequest('POST', uri);
-    
-    // Add Authorization header
-    final token = await AuthService.getToken();
-    if (token != null) {
-      request.headers['Authorization'] = 'Bearer $token';
-    }
 
     request.files.add(
       http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
     );
 
+    // Attach password payload to fields if provided
     if (password != null && password.isNotEmpty) {
       request.fields['password'] = password;
     }
@@ -153,100 +43,188 @@ class StatementService {
     final streamedResponse = await request.send().timeout(
       const Duration(seconds: 120),
     );
+
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 200) {
-      return StatementResponse.fromJson(jsonDecode(response.body));
+      final jsonData = jsonDecode(response.body);
+      return StatementResponse.fromJson(jsonData);
     }
+
+    // Catch password status signals from the backend
     if (response.statusCode == 401) {
-      throw FormatException(
-        jsonDecode(response.body)['detail'] ?? 'PASSWORD_ERROR',
-      );
+      final errorDetail = jsonDecode(response.body)['detail'];
+      throw FormatException(errorDetail ?? 'PASSWORD_ERROR');
     }
+
     throw Exception('Upload failed: ${response.body}');
   }
 
+  /// GET /api/statements
+  /// Retrieves and lists all parsed bank statements with their structural database IDs
   static Future<List<StatementMetadata>> listStatements() async {
-    final response = await http
-        .get(Uri.parse(baseUrl), headers: await _getHeaders())
-        .timeout(const Duration(seconds: 30));
+    final uri = Uri.parse(baseUrl);
+    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
     if (response.statusCode == 200) {
       final jsonData = jsonDecode(response.body) as List;
       return jsonData.map((item) => StatementMetadata.fromJson(item)).toList();
     }
+
     throw Exception('Failed to list statements: ${response.body}');
   }
 
-  static Future<StatementResponse> getStatement(
-    String statementId,
-  ) async {
-    final response = await http
-        .get(Uri.parse('$baseUrl/$statementId'), headers: await _getHeaders())
-        .timeout(const Duration(seconds: 30));
-    if (response.statusCode == 200)
-      return StatementResponse.fromJson(jsonDecode(response.body));
-    throw Exception('Failed to fetch statement: ${response.body}');
-  }
-
+  /// GET /api/statements/{statement_id}/insights
+  /// Pulls dynamic aggregates, category spending item breakdowns, and subscription checks
   static Future<StatementInsights> getStatementInsights(
     String statementId,
   ) async {
-    final response = await http
-        .get(Uri.parse('$baseUrl/$statementId/insights'), headers: await _getHeaders())
-        .timeout(const Duration(seconds: 30));
-    if (response.statusCode == 200)
-      return StatementInsights.fromJson(jsonDecode(response.body));
+    final uri = Uri.parse('$baseUrl/$statementId/insights');
+    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      final jsonData = jsonDecode(response.body);
+      return StatementInsights.fromJson(jsonData);
+    }
+
     throw Exception('Failed to fetch insights: ${response.body}');
   }
 
+  /// GET /api/statements/{statement_id}/visualization
+  /// Compiles premium health scores, timeline time-series data points, and budget frameworks
   static Future<VisualizationResponse> getStatementVisualization(
     String statementId,
   ) async {
-    final response = await http
-        .get(Uri.parse('$baseUrl/$statementId/visualization'), headers: await _getHeaders())
-        .timeout(const Duration(seconds: 30));
-    if (response.statusCode == 200)
-      return VisualizationResponse.fromJson(jsonDecode(response.body));
-    throw Exception('Failed to fetch visualization: ${response.body}');
+    final uri = Uri.parse('$baseUrl/$statementId/visualization');
+    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      final jsonData = jsonDecode(response.body);
+      return VisualizationResponse.fromJson(jsonData);
+    }
+
+    throw Exception('Failed to fetch visualization data: ${response.body}');
   }
 
+  /// GET /api/statements/{statement_id}/ai-coach
+  /// Fetches ONLY the AI-powered textual summary evaluation and structured prioritized recommendations
   static Future<Map<String, dynamic>> getStatementAICoach(
     String statementId,
   ) async {
-    final response = await http
-        .get(Uri.parse('$baseUrl/$statementId/ai-coach'), headers: await _getHeaders())
-        .timeout(const Duration(seconds: 30));
-    if (response.statusCode == 200)
+    final uri = Uri.parse('$baseUrl/$statementId/ai-coach');
+    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
-    throw Exception('AI Coach failure: ${response.body}');
+    }
+
+    throw Exception('AI Coach pipeline failure: ${response.body}');
   }
 
+  /// POST /api/statements/{statement_id}/chat
+  /// RAG-based interactive chat utility matching indexed transaction narration vectors
   static Future<String> chatWithStatement({
     required String statementId,
     required String message,
-    required List<Map<String, String>> chatHistory,
+    required List<Map<String, String>>
+    chatHistory, // Changed from List<String> to accept structured rows
   }) async {
+    final uri = Uri.parse('$baseUrl/$statementId/chat');
+
+    // Map the internal frontend message objects into the JSON key structure expected by the backend
+    final formattedHistory = chatHistory
+        .map(
+          (m) => {
+            'role': m['sender'] == 'user'
+                ? 'user'
+                : 'assistant', // Map role to standard LLM schemas (user/assistant)
+            'content': m['text'] ?? '',
+          },
+        )
+        .toList();
+
     final response = await http
         .post(
-          Uri.parse('$baseUrl/$statementId/chat'),
-          headers: await _getHeaders(),
+          uri,
+          headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'message': message,
-            'chat_history': chatHistory
-                .map(
-                  (m) => {
-                    'role': m['sender'] == 'user' ? 'user' : 'assistant',
-                    'content': m['text'] ?? '',
-                  },
-                )
-                .toList(),
+            'chat_history':
+                formattedHistory, // Passing structured dictionaries satisfying Pydantic validation
           }),
         )
         .timeout(const Duration(seconds: 45));
 
-    if (response.statusCode == 200)
-      return jsonDecode(response.body)['response'] ?? '';
-    throw Exception('Chat agent fault: ${response.body}');
+    if (response.statusCode == 200) {
+      final jsonData = jsonDecode(response.body);
+      return jsonData['response'] ?? '';
+    }
+
+    throw Exception('Semantic document query agent fault: ${response.body}');
+  }
+
+  /// GET /api/statements/{statement_id}
+  /// Retrieves full details of a specific statement, including its transaction list
+  static Future<StatementResponse> getStatement(String statementId) async {
+    final uri = Uri.parse('$baseUrl/$statementId');
+    final token = await AuthService.getToken();
+    final headers = <String, String>{};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    
+    final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      final jsonData = jsonDecode(response.body);
+      return StatementResponse.fromJson(jsonData);
+    }
+
+    throw Exception('Failed to fetch statement details: ${response.body}');
+  }
+
+  /// GET /api/statements/{statement_id}/export-pdf
+  /// Generates and exports a premium PDF report cross-platform
+  static Future<void> exportStatementPdf(String statementId) async {
+    final uri = Uri.parse('$baseUrl/$statementId/export-pdf');
+    final token = await AuthService.getToken();
+    final headers = <String, String>{};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 45));
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to export PDF: ${response.body}');
+    }
+
+    if (kIsWeb) {
+      // Secure, high-performance web sandbox download execution via JS interop
+      final base64Pdf = base64Encode(response.bodyBytes);
+      js.context.callMethod('eval', ["""
+        var byteCharacters = atob('$base64Pdf');
+        var byteNumbers = new Array(byteCharacters.length);
+        for (var i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        var byteArray = new Uint8Array(byteNumbers);
+        var blob = new Blob([byteArray], {type: 'application/pdf'});
+        var link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = 'StatementX_Report_$statementId.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      """]);
+    } else {
+      // Mobile Documents directory storage and immediate display
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = '${directory.path}/StatementX_Report_$statementId.pdf';
+      final file = io.File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+      await OpenFile.open(filePath);
+    }
   }
 }
 

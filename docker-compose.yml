@@ -2,7 +2,7 @@ version: '3.9'
 
 # ==============================================================================
 # StatementX Multi-Container Production Orchestration Configuration
-# Tech Stack: Postgres 16 (w/ pgvector), FastAPI Backend, Flutter Frontend, Nginx Reverse Proxy
+# Tech Stack: Postgres 16, FastAPI Backend, Flutter Frontend, Nginx Reverse Proxy
 # ==============================================================================
 
 networks:
@@ -24,10 +24,10 @@ volumes:
 
 services:
   # ----------------------------------------------------------------------------
-  # 1. PostgreSQL Database Service with native pgvector extension
+  # 1. PostgreSQL Database Service
   # ----------------------------------------------------------------------------
   db:
-    image: pgvector/pgvector:16-pgdg
+    image: postgres:16-alpine
     container_name: statementx-db
     restart: unless-stopped
     security_opt:
@@ -69,12 +69,9 @@ services:
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       HF_TOKEN: ${HF_TOKEN}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-statementx}
+      DATABASE_URL: ${DATABASE_URL}
       PROJECT_NAME: ${PROJECT_NAME:-StatementX AI Core Engine}
       API_STR: ${API_STR:-/api}
-      SECRET_KEY: ${SECRET_KEY}
-      GOOGLE_WEB_CLIENT_ID: ${GOOGLE_WEB_CLIENT_ID}
-      GOOGLE_ANDROID_CLIENT_ID: ${GOOGLE_ANDROID_CLIENT_ID}
     depends_on:
       db:
         condition: service_healthy
