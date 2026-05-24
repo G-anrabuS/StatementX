@@ -44,11 +44,12 @@ def parse_robust_date(date_str: str) -> date:
 
 class StatementService:
     @staticmethod
-    def save_statement(db, file_name, extracted_data):
+    def save_statement(db, file_name, extracted_data, user_id=None):
         statement = Statement(
             file_name=file_name,
             bank_name=extracted_data.bank_name,
             raw_ai_output=extracted_data.model_dump(),
+            user_id=user_id,
         )
 
         db.add(statement)

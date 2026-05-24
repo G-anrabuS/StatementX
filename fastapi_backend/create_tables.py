@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from app.core.database import engine, Base
+from app.models.user import User
 from app.models.statement import Statement, StatementThesisChunk
 from app.models.transaction import Transaction
 from app.models.merchant_cache import MerchantCache

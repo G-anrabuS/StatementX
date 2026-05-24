@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../models/insights_model.dart';
+import '../models/statement_model.dart';
 import 'upload_screen.dart';
+import 'transaction_screen.dart';
+import 'insights_screen.dart';
+import 'visualization_screen.dart';
+import 'chat_bot_screen.dart';
+import 'login_screen.dart';
+import '../services/auth_service.dart';
+import '../services/statement_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -10,14 +19,55 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Teammate's scrolling controllers & keys
   final ScrollController _scrollController = ScrollController();
-  
-  // Section keys for scrolling behavior
   final GlobalKey _heroKey = GlobalKey();
   final GlobalKey _featuresKey = GlobalKey();
   final GlobalKey _securityKey = GlobalKey();
+  bool _isDarkMode = false;
 
-  bool _isDarkMode = false; // Toggle placeholder state
+  // Dynamic data states
+  String? currentStatementId;
+  String? currentBankName;
+  bool _isLoading = true;
+  StatementInsights? _insights;
+  List<StatementMetadata> _statements = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshData();
+  }
+
+  Future<void> _refreshData() async {
+    setState(() => _isLoading = true);
+    try {
+      final statements = await StatementService.listStatements();
+      if (statements.isNotEmpty) {
+        final latest = statements.first;
+        final insights = await StatementService.getStatementInsights(latest.statementId);
+        
+        setState(() {
+          _statements = statements;
+          currentStatementId = latest.statementId;
+          currentBankName = latest.bankName;
+          _insights = insights;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _statements = [];
+          currentStatementId = null;
+          currentBankName = null;
+          _insights = null;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error refreshing home data: $e');
+      setState(() => _isLoading = false);
+    }
+  }
 
   void _scrollToSection(GlobalKey key) {
     final context = key.currentContext;
@@ -30,10 +80,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _navigateToUploader() {
-    Navigator.push(
+  void _navigateToUploader() async {
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const UploadScreen()),
+    );
+    _refreshData();
+  }
+
+  void _showNoStatementWarning(String screenName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Please upload a bank statement first to open $screenName.'),
+        backgroundColor: Colors.redAccent,
+        action: SnackBarAction(
+          label: 'UPLOAD',
+          textColor: Colors.white,
+          onPressed: _navigateToUploader,
+        ),
+      ),
     );
   }
 
@@ -55,177 +120,36 @@ class _HomeScreenState extends State<HomeScreen> {
     const Color textNavy = Color(0xFF0F172A);
     const Color textMuted = Color(0xFF475569);
 
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // RESOLUTION STRATEGY:
+    // If user has no statements, show the Teammate's landing page.
+    // If user has statements, show the Dashboard UI.
+    
+    final bool showDashboard = currentStatementId != null;
+
     return Scaffold(
-      backgroundColor: _isDarkMode ? const Color(0xFF0F172A) : bgSlate,
+      backgroundColor: _isDarkMode ? const Color(0xFF0F172A) : (showDashboard ? AppColors.bgLight : bgSlate),
       drawer: isMobile ? _buildMobileDrawer(brandBlue) : null,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(70),
-        child: _buildHeader(isMobile, brandBlue, textNavy),
+        child: showDashboard 
+          ? _buildDashboardHeader() 
+          : _buildLandingHeader(isMobile, brandBlue, textNavy),
       ),
-      body: SingleChildScrollView(
-        controller: _scrollController,
-        child: Column(
-          children: [
-            // 1. HERO SECTION
-            Container(
-              key: _heroKey,
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(
-                vertical: isMobile ? 32 : 64,
-                horizontal: isMobile ? 18 : 36,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: isMobile
-                      ? Column(
-                          children: [
-                            _buildHeroLeft(isMobile, brandBlue, brandTeal, textNavy, textMuted),
-                            const SizedBox(height: 36),
-                            _buildHeroRight(isMobile),
-                          ],
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              flex: 5,
-                              child: _buildHeroLeft(isMobile, brandBlue, brandTeal, textNavy, textMuted),
-                            ),
-                            const SizedBox(width: 48),
-                            Expanded(
-                              flex: 5,
-                              child: _buildHeroRight(isMobile),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // 2. FEATURES SECTION
-            Container(
-              key: _featuresKey,
-              width: double.infinity,
-              color: _isDarkMode ? const Color(0xFF1E293B) : Colors.white,
-              padding: EdgeInsets.symmetric(
-                vertical: isMobile ? 48 : 80,
-                horizontal: isMobile ? 18 : 36,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Powerful Features',
-                        style: TextStyle(
-                          color: _isDarkMode ? Colors.white : textNavy,
-                          fontSize: isMobile ? 26 : 34,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: 60,
-                        height: 3.5,
-                        decoration: BoxDecoration(
-                          color: brandBlue,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-                      isMobile
-                          ? Column(
-                              children: [
-                                _buildFeatureCard(
-                                  icon: Icons.pie_chart_rounded,
-                                  iconColor: const Color(0xFF8B5CF6),
-                                  title: 'Smart Analysis',
-                                  desc: 'Automatically analyzes your statement and provides meaningful insights.',
-                                ),
-                                const SizedBox(height: 20),
-                                _buildFeatureCard(
-                                  icon: Icons.bar_chart_rounded,
-                                  iconColor: const Color(0xFF10B981),
-                                  title: 'Expense Breakdown',
-                                  desc: 'Categorizes your expenses and shows where your money is going.',
-                                ),
-                                const SizedBox(height: 20),
-                                _buildFeatureCard(
-                                  icon: Icons.shield_rounded,
-                                  iconColor: const Color(0xFFF59E0B),
-                                  title: 'Secure & Private',
-                                  desc: 'We use bank-level security to keep your data safe and private.',
-                                ),
-                              ],
-                            )
-                          : Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: _buildFeatureCard(
-                                    icon: Icons.pie_chart_rounded,
-                                    iconColor: const Color(0xFF8B5CF6),
-                                    title: 'Smart Analysis',
-                                    desc: 'Automatically analyzes your statement and provides meaningful insights.',
-                                  ),
-                                ),
-                                const SizedBox(width: 24),
-                                Expanded(
-                                  child: _buildFeatureCard(
-                                    icon: Icons.bar_chart_rounded,
-                                    iconColor: const Color(0xFF10B981),
-                                    title: 'Expense Breakdown',
-                                    desc: 'Categorizes your expenses and shows where your money is going.',
-                                  ),
-                                ),
-                                const SizedBox(width: 24),
-                                Expanded(
-                                  child: _buildFeatureCard(
-                                    icon: Icons.shield_rounded,
-                                    iconColor: const Color(0xFFF59E0B),
-                                    title: 'Secure & Private',
-                                    desc: 'We use bank-level security to keep your data safe and private.',
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. WORKS EVERYWHERE (SECURITY) SECTION
-            Container(
-              key: _securityKey,
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(
-                vertical: isMobile ? 48 : 64,
-                horizontal: isMobile ? 18 : 36,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: _buildWorksEverywhereBanner(isMobile, brandBlue),
-                ),
-              ),
-            ),
-
-            // 4. FOOTER SECTION
-            _buildFooter(isMobile, textNavy, textMuted),
-          ],
-        ),
-      ),
+      body: showDashboard 
+        ? _buildDashboardBody(isMobile) 
+        : _buildLandingBody(isMobile, brandBlue, brandTeal, textNavy, textMuted, bgSlate),
     );
   }
 
-  // APP BAR / HEADER WIDGET
-  Widget _buildHeader(bool isMobile, Color brandBlue, Color textNavy) {
+  // --- LANDING PAGE WIDGETS (TEAMMATE'S CODE) ---
+
+  Widget _buildLandingHeader(bool isMobile, Color brandBlue, Color textNavy) {
     return AppBar(
       backgroundColor: _isDarkMode ? const Color(0xFF0F172A) : Colors.white,
       elevation: 0,
@@ -268,9 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!isMobile) ...[
           _buildHeaderNavLink('Home', () => _scrollToSection(_heroKey)),
           _buildHeaderNavLink('Features', () => _scrollToSection(_featuresKey)),
-          _buildHeaderNavLink('How It Works', () => _scrollToSection(_securityKey)),
           _buildHeaderNavLink('Security', () => _scrollToSection(_securityKey)),
-          _buildHeaderNavLink('About', () => _scrollToSection(_heroKey)),
           const SizedBox(width: 8),
         ],
         IconButton(
@@ -290,6 +212,337 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildLandingBody(bool isMobile, Color brandBlue, Color brandTeal, Color textNavy, Color textMuted, Color bgSlate) {
+    return SingleChildScrollView(
+      controller: _scrollController,
+      child: Column(
+        children: [
+          // 1. HERO SECTION
+          Container(
+            key: _heroKey,
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+              vertical: isMobile ? 32 : 64,
+              horizontal: isMobile ? 18 : 36,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: isMobile
+                    ? Column(
+                        children: [
+                          _buildHeroLeft(isMobile, brandBlue, brandTeal, textNavy, textMuted),
+                          const SizedBox(height: 36),
+                          _buildHeroRight(isMobile),
+                        ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: _buildHeroLeft(isMobile, brandBlue, brandTeal, textNavy, textMuted),
+                          ),
+                          const SizedBox(width: 48),
+                          Expanded(
+                            flex: 5,
+                            child: _buildHeroRight(isMobile),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 2. FEATURES SECTION
+          Container(
+            key: _featuresKey,
+            width: double.infinity,
+            color: _isDarkMode ? const Color(0xFF1E293B) : Colors.white,
+            padding: EdgeInsets.symmetric(
+              vertical: isMobile ? 48 : 80,
+              horizontal: isMobile ? 18 : 36,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Column(
+                  children: [
+                    Text(
+                      'Powerful Features',
+                      style: TextStyle(
+                        color: _isDarkMode ? Colors.white : textNavy,
+                        fontSize: isMobile ? 26 : 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 60,
+                      height: 3.5,
+                      decoration: BoxDecoration(
+                        color: brandBlue,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                    isMobile
+                        ? Column(
+                            children: [
+                              _buildFeatureCard(
+                                icon: Icons.pie_chart_rounded,
+                                iconColor: const Color(0xFF8B5CF6),
+                                title: 'Smart Analysis',
+                                desc: 'Automatically analyzes your statement and provides meaningful insights.',
+                              ),
+                              const SizedBox(height: 20),
+                              _buildFeatureCard(
+                                icon: Icons.bar_chart_rounded,
+                                iconColor: const Color(0xFF10B981),
+                                title: 'Expense Breakdown',
+                                desc: 'Categorizes your expenses and shows where your money is going.',
+                              ),
+                              const SizedBox(height: 20),
+                              _buildFeatureCard(
+                                icon: Icons.shield_rounded,
+                                iconColor: const Color(0xFFF59E0B),
+                                title: 'Secure & Private',
+                                desc: 'We use bank-level security to keep your data safe and private.',
+                              ),
+                            ],
+                          )
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: _buildFeatureCard(
+                                  icon: Icons.pie_chart_rounded,
+                                  iconColor: const Color(0xFF8B5CF6),
+                                  title: 'Smart Analysis',
+                                  desc: 'Automatically analyzes your statement and provides meaningful insights.',
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                              Expanded(
+                                child: _buildFeatureCard(
+                                  icon: Icons.bar_chart_rounded,
+                                  iconColor: const Color(0xFF10B981),
+                                  title: 'Expense Breakdown',
+                                  desc: 'Categorizes your expenses and shows where your money is going.',
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                              Expanded(
+                                child: _buildFeatureCard(
+                                  icon: Icons.shield_rounded,
+                                  iconColor: const Color(0xFFF59E0B),
+                                  title: 'Secure & Private',
+                                  desc: 'We use bank-level security to keep your data safe and private.',
+                                ),
+                              ),
+                            ],
+                          ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 3. WORKS EVERYWHERE (SECURITY) SECTION
+          Container(
+            key: _securityKey,
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+              vertical: isMobile ? 48 : 64,
+              horizontal: isMobile ? 18 : 36,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: _buildWorksEverywhereBanner(isMobile, brandBlue),
+              ),
+            ),
+          ),
+
+          // 4. FOOTER SECTION
+          _buildFooter(isMobile, textNavy, textMuted),
+        ],
+      ),
+    );
+  }
+
+  // --- DASHBOARD WIDGETS (MY CODE) ---
+
+  PreferredSizeWidget _buildDashboardHeader() {
+    return AppBar(
+      backgroundColor: AppColors.surfaceLight,
+      elevation: 0,
+      centerTitle: true,
+      leading: PopupMenuButton<String>(
+        icon: const Icon(Icons.menu, color: AppColors.textPrimary, size: 24),
+        tooltip: 'Quick Navigation Menu',
+        onSelected: (value) => _handleNavigation(value),
+        itemBuilder: (BuildContext context) => _buildMenuOptions(),
+      ),
+      title: RichText(
+        text: const TextSpan(
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          children: [
+            TextSpan(text: 'Statement', style: TextStyle(color: AppColors.textPrimary)),
+            TextSpan(text: 'X', style: TextStyle(color: AppColors.secondaryTeal)),
+          ],
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, color: AppColors.textPrimary),
+          onPressed: _refreshData,
+        ),
+        const SizedBox(width: 12),
+      ],
+    );
+  }
+
+  Widget _buildDashboardBody(bool isMobile) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Financial Analytics Control Hub',
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Active Ledger: ${currentBankName ?? "No statements loaded"}',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+
+              _buildKpiRibbon(isMobile),
+              const SizedBox(height: 24),
+
+              const Text(
+                'Execution Shortcuts',
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              _buildShortcutGrid(isMobile),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKpiRibbon(bool isMobile) {
+    return GridView.count(
+      crossAxisCount: isMobile ? 1 : 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      childAspectRatio: isMobile ? 3.5 : 2.2,
+      children: [
+        _buildKpiCard('TOTAL DEPOSITS', '₹${_insights?.totalIncome.toStringAsFixed(0) ?? "0"}', Icons.arrow_upward_rounded, AppColors.primaryGreen),
+        _buildKpiCard('TOTAL OUTFLOWS', '₹${_insights?.totalExpense.toStringAsFixed(0) ?? "0"}', Icons.arrow_downward_rounded, const Color(0xFFC62828)),
+        _buildKpiCard('NET SAVINGS SURPLUS', '₹${_insights?.netSavings.toStringAsFixed(0) ?? "0"}', Icons.account_balance_wallet_rounded, AppColors.secondaryTeal),
+      ],
+    );
+  }
+
+  Widget _buildKpiCard(String title, String value, IconData icon, Color accentColor) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.015), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(title, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+              const SizedBox(height: 6),
+              Text(value, style: const TextStyle(color: AppColors.textPrimary, fontSize: 22, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: accentColor.withOpacity(0.08),
+            child: Icon(icon, color: accentColor, size: 20),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShortcutGrid(bool isMobile) {
+    return GridView.count(
+      crossAxisCount: isMobile ? 2 : 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 14,
+      crossAxisSpacing: 14,
+      childAspectRatio: 1.1,
+      children: [
+        _buildShortcutCard('Upload Parser', 'Import statement files', Icons.upload_file_rounded, AppColors.primaryGreen, 'upload'),
+        _buildShortcutCard('Transactions', 'Review complete ledgers', Icons.receipt_long_rounded, Colors.blueAccent, 'transaction'),
+        _buildShortcutCard('Insights Summary', 'Spend breakdowns & anomalies', Icons.insights_rounded, Colors.orangeAccent, 'insights'),
+        _buildShortcutCard('AI Semantic Chat', 'Query documents cleanly', Icons.chat_bubble_outline_rounded, AppColors.secondaryTeal, 'chatbot'),
+      ],
+    );
+  }
+
+  Widget _buildShortcutCard(String title, String desc, IconData icon, Color color, String route) {
+    return InkWell(
+      onTap: () => _handleNavigation(route),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.borderLight),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Icon(icon, color: color, size: 28),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, height: 1.2)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- HELPERS & SHARED WIDGETS ---
+
   Widget _buildHeaderNavLink(String label, VoidCallback onTap) {
     return TextButton(
       onPressed: onTap,
@@ -304,7 +557,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // MOBILE DRAWER
   Widget _buildMobileDrawer(Color brandBlue) {
     return Drawer(
       backgroundColor: _isDarkMode ? const Color(0xFF0F172A) : Colors.white,
@@ -332,46 +584,45 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(context);
               _scrollToSection(_featuresKey);
             }),
-            _buildDrawerItem(Icons.psychology_rounded, 'How It Works', () {
-              Navigator.pop(context);
-              _scrollToSection(_securityKey);
-            }),
             _buildDrawerItem(Icons.security_rounded, 'Security', () {
               Navigator.pop(context);
               _scrollToSection(_securityKey);
             }),
-            _buildDrawerItem(Icons.info_rounded, 'About', () {
-              Navigator.pop(context);
-              _scrollToSection(_heroKey);
-            }),
             const Divider(indent: 16, endIndent: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _navigateToUploader();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: brandBlue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+            if (currentStatementId != null) ...[
+               _buildDrawerItem(Icons.logout_rounded, 'Sign Out', () {
+                 Navigator.pop(context);
+                 _handleLogout();
+               }),
+            ] else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _navigateToUploader();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: brandBlue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    'Login',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Colors.white,
+                    child: const Text(
+                      'Get Started',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+            ]
           ],
         ),
       ),
@@ -392,13 +643,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // HERO: LEFT HALF (TEXT / CALL-TO-ACTIONS)
   Widget _buildHeroLeft(bool isMobile, Color brandBlue, Color brandTeal, Color textNavy, Color textMuted) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
-        // Pill Badge "Smart. Secure. Simple."
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
@@ -423,8 +672,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(height: isMobile ? 18 : 28),
-
-        // Hero Titles
         Text(
           'Bank Statement',
           textAlign: isMobile ? TextAlign.center : TextAlign.start,
@@ -453,8 +700,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(height: isMobile ? 16 : 24),
-
-        // Subtitle
         Text(
           'Upload your bank statement and get instant insights about your income, expenses, savings and overall financial health.',
           textAlign: isMobile ? TextAlign.center : TextAlign.start,
@@ -465,108 +710,29 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(height: isMobile ? 24 : 36),
-
-        // Action Buttons Grid
-        isMobile
-            ? Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _navigateToUploader,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: brandBlue,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Login',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: OutlinedButton(
-                      onPressed: _navigateToUploader,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: brandBlue,
-                        side: BorderSide(color: brandBlue.withOpacity(0.4), width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : Row(
-                children: [
-                  SizedBox(
-                    width: 140,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _navigateToUploader,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: brandBlue,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Login',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  SizedBox(
-                    width: 140,
-                    height: 48,
-                    child: OutlinedButton(
-                      onPressed: _navigateToUploader,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: brandBlue,
-                        side: BorderSide(color: brandBlue, width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+        SizedBox(
+          width: isMobile ? double.infinity : 200,
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _navigateToUploader,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: brandBlue,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'Get Started',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
         SizedBox(height: isMobile ? 20 : 32),
-
-        // Subtext Security Alert
         Row(
           mainAxisAlignment: isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
           children: [
@@ -586,10 +752,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // HERO: RIGHT HALF (3D-LIKE VECTOR ILLUSTRATION DESIGN)
   Widget _buildHeroRight(bool isMobile) {
     final scale = isMobile ? 0.75 : 1.0;
-    
     return Center(
       child: Container(
         height: 380 * scale,
@@ -599,7 +763,6 @@ class _HomeScreenState extends State<HomeScreen> {
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            // 1. Soft Glow Backdrop
             Container(
               height: 280 * scale,
               width: 280 * scale,
@@ -613,8 +776,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
-            // 2. Base "Bank Statement" Sheet (Slightly angled/skewed)
             Transform(
               transform: Matrix4.identity()
                 ..setEntry(3, 2, 0.001)
@@ -655,8 +816,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 6),
                     Container(height: 5 * scale, width: 50 * scale, color: const Color(0xFFF1F5F9)),
                     const SizedBox(height: 20),
-                    
-                    // Donut Chart Vector Representation
                     Center(
                       child: Stack(
                         alignment: Alignment.center,
@@ -683,8 +842,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    
-                    // Micro Bar Graph Mockup
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -699,8 +856,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
-            // 3. Floating Credit Card (Placed overlapping the statement card)
             Positioned(
               left: -48 * scale,
               bottom: 40 * scale,
@@ -782,8 +937,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
-            // 4. Floating Checkmark Security Shield (Bottom right offset)
             Positioned(
               right: -30 * scale,
               bottom: 24 * scale,
@@ -824,7 +977,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // FEATURES: CARD BUILDER WIDGET
   Widget _buildFeatureCard({
     required IconData icon,
     required Color iconColor,
@@ -852,7 +1004,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Circular Icon Frame
           CircleAvatar(
             radius: 26,
             backgroundColor: iconColor.withOpacity(0.09),
@@ -882,7 +1033,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SECURITY: WORKS EVERYWHERE BANNER
   Widget _buildWorksEverywhereBanner(bool isMobile, Color brandBlue) {
     return Container(
       width: double.infinity,
@@ -1007,7 +1157,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // FOOTER WIDGET
   Widget _buildFooter(bool isMobile, Color textNavy, Color textMuted) {
     return Container(
       width: double.infinity,
@@ -1022,7 +1171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.account_balance_rounded, color: const Color(0xFF4F46E5), size: 18),
+                        const Icon(Icons.account_balance_rounded, color: Color(0xFF4F46E5), size: 18),
                         const SizedBox(width: 8),
                         Text(
                           'Bank Statement Analyzer',
@@ -1049,7 +1198,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.account_balance_rounded, color: const Color(0xFF4F46E5), size: 18),
+                        const Icon(Icons.account_balance_rounded, color: Color(0xFF4F46E5), size: 18),
                         const SizedBox(width: 8),
                         Text(
                           'Bank Statement Analyzer',
@@ -1073,5 +1222,113 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  // --- MENU & NAVIGATION ---
+
+  List<PopupMenuEntry<String>> _buildMenuOptions() {
+    return [
+      _buildMenuItem('home', 'Home Dashboard', Icons.home_rounded, AppColors.textSecondary),
+      _buildMenuItem('upload', 'PDF / CSV Upload', Icons.upload_file_rounded, AppColors.primaryGreen),
+      _buildMenuItem('transaction', 'Transactions Ledger', Icons.receipt_long_rounded, Colors.blueAccent),
+      _buildMenuItem('insights', 'Financial Insights', Icons.insights_rounded, Colors.orangeAccent),
+      _buildMenuItem('visualization', 'Analytics Dashboard', Icons.bar_chart_rounded, Colors.indigoAccent),
+      _buildMenuItem('chatbot', 'AI Semantic Chat', Icons.chat_bubble_outline_rounded, AppColors.secondaryTeal),
+      const PopupMenuDivider(),
+      _buildMenuItem('logout', 'Sign Out', Icons.logout_rounded, Colors.redAccent),
+    ];
+  }
+
+  PopupMenuItem<String> _buildMenuItem(String value, String text, IconData icon, Color color) {
+    return PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Text(text),
+        ],
+      ),
+    );
+  }
+
+  void _handleNavigation(String route) async {
+    switch (route) {
+      case 'home':
+        break;
+      case 'upload':
+        _navigateToUploader();
+        break;
+      case 'transaction':
+        if (currentStatementId != null) {
+          setState(() => _isLoading = true);
+          try {
+            final details = await StatementService.getStatement(currentStatementId!);
+            if (mounted) {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => TransactionsScreen(
+                transactions: details.transactions, 
+                bankName: currentBankName ?? 'Bank', 
+                statementId: currentStatementId
+              )));
+            }
+          } catch (e) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+          } finally {
+            if (mounted) setState(() => _isLoading = false);
+          }
+        } else {
+          _showNoStatementWarning('Transactions');
+        }
+        break;
+      case 'insights':
+        if (currentStatementId != null && _insights != null) {
+          setState(() => _isLoading = true);
+          try {
+            final details = await StatementService.getStatement(currentStatementId!);
+            if (mounted) {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => InsightsScreen(
+                statementId: currentStatementId!, 
+                bankName: currentBankName ?? 'Bank', 
+                insights: _insights!, 
+                totalTransactions: details.totalTransactions
+              )));
+            }
+          } catch (e) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+          } finally {
+            if (mounted) setState(() => _isLoading = false);
+          }
+        } else {
+          _showNoStatementWarning('Insights');
+        }
+        break;
+      case 'visualization':
+        if (currentStatementId != null) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => VisualizationScreen(statementId: currentStatementId!)));
+        } else {
+          _showNoStatementWarning('Analytics Dashboard');
+        }
+        break;
+      case 'chatbot':
+        if (currentStatementId != null) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => ChatBotScreen(statementId: currentStatementId!)));
+        } else {
+          _showNoStatementWarning('AI Semantic Chat');
+        }
+        break;
+      case 'logout':
+        _handleLogout();
+        break;
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    await AuthService.logout();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 }

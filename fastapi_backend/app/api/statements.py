@@ -26,6 +26,8 @@ from app.services.statement_service import StatementService
 from app.services.onnx_categorizer import categorize_items
 from app.services.merchant_cache import MerchantCacheService
 from app.core.database import get_db
+from app.api.auth import get_current_user
+from app.models.user import User
 
 router = APIRouter()
 
@@ -97,6 +99,7 @@ async def extract_statement(
     file: UploadFile = File(...),
     password: str = Form(None),  # <-- Add optional form parameter for password
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
@@ -181,6 +184,7 @@ async def extract_statement(
             db=db,
             file_name=file.filename,
             extracted_data=extracted_result,
+            user_id=current_user.user_id if current_user else None,
         )
 
         extracted_result.statement_id = str(statement_record.statement_id)
@@ -204,11 +208,18 @@ async def extract_statement(
 
 
 @router.get("", response_model=List[dict])
-async def list_statements(db: Session = Depends(get_db)):
+async def list_statements(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Retrieves and lists all uploaded bank statements with their metadata and database IDs.
     """
-    statements = db.query(Statement).order_by(Statement.uploaded_at.desc()).all()
+    query = db.query(Statement)
+    if current_user:
+        query = query.filter(Statement.user_id == current_user.user_id)
+    
+    statements = query.order_by(Statement.uploaded_at.desc()).all()
     return [
         {
             "statement_id": str(s.statement_id),
@@ -220,16 +231,50 @@ async def list_statements(db: Session = Depends(get_db)):
     ]
 
 
+async def _verify_statement_ownership(db: Session, statement_id: str, current_user: User):
+    """Internal helper to verify statement existence and ownership."""
+    query = db.query(Statement).filter(Statement.statement_id == statement_id)
+    if current_user:
+        query = query.filter(Statement.user_id == current_user.user_id)
+    
+    statement = query.first()
+    if not statement:
+        raise HTTPException(
+            status_code=404,
+            detail="Statement not found or access denied."
+        )
+    return statement
+
+
+@router.get("/{statement_id}", response_model=StatementExtractionResponse)
+async def get_statement_details(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retrieves full details of a specific statement, including its transaction list.
+    """
+    statement = await _verify_statement_ownership(db, statement_id, current_user)
+    
+    # Reconstruct the response from the stored raw output
+    response = StatementExtractionResponse(**statement.raw_ai_output)
+    response.statement_id = str(statement.statement_id)
+    return response
+
+
 @router.get("/{statement_id}/insights", response_model=StatementInsightsResponse)
 async def get_statement_insights(
     statement_id: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Retrieves and generates dynamic aggregates, category spending breakdowns,
     recurring subscription checks, and suspicious transaction anomaly logs
     for a specific statement ID.
     """
+    await _verify_statement_ownership(db, statement_id, current_user)
     try:
         insights = await InsightsService.generate_statement_insights(
             db, statement_id, include_ai_coach=False
@@ -246,11 +291,13 @@ async def get_statement_insights(
 async def get_statement_ai_coach(
     statement_id: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Retrieves and generates ONLY the AI-powered financial summary and recommendations
     (narrative coach analysis and structured prioritized actions) for a specific statement ID.
     """
+    await _verify_statement_ownership(db, statement_id, current_user)
     try:
         insights = await InsightsService.generate_statement_insights(
             db, statement_id, include_ai_coach=True
@@ -271,11 +318,13 @@ async def chat_with_statement(
     statement_id: str,
     payload: ChatRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     RAG-based semantic chatbot to chat with a bank statement's transactions.
     Indexes narration descriptions into 768-dimension vectors and searches them semantically.
     """
+    await _verify_statement_ownership(db, statement_id, current_user)
     try:
         reply, sources = await ChatbotService.chat_with_statement(
             db=db,
@@ -295,12 +344,14 @@ async def chat_with_statement(
 async def get_statement_visualization(
     statement_id: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Retrieves personal finance intelligence, indicators, and charts visualization aggregates
     (Cash Flow timeline, 50/30/20 budget framework, weekday/weekend distribution, category breakdown)
     for a specific statement ID.
     """
+    await _verify_statement_ownership(db, statement_id, current_user)
     try:
         data = VisualizationService.calculate_visualization_data(db, statement_id)
         return data
@@ -320,11 +371,13 @@ async def get_statement_visualization(
 async def export_statement_pdf_report(
     statement_id: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Generates and exports a premium 5-page financial health assessment and transaction breakdown
     PDF report for immediate download.
     """
+    await _verify_statement_ownership(db, statement_id, current_user)
     try:
         pdf_buffer = PDFReportService.generate_pdf_report(db, statement_id)
 

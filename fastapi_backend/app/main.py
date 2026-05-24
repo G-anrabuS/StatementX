@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.statements import router as statements_router
+from app.api.auth import router as auth_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -21,6 +22,12 @@ app.include_router(
     statements_router,
     prefix=f"{settings.API_STR}/statements",
     tags=["Statement Processing Services Framework"],
+)
+
+app.include_router(
+    auth_router,
+    prefix=f"{settings.API_STR}/auth",
+    tags=["Authentication Services Framework"],
 )
 
 

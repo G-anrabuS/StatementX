@@ -10,10 +10,23 @@ class Settings:
 
     GEMINI_API_KEY: str
     DATABASE_URL: str
+    
+    # JWT Configuration
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    
+    # Google OAuth Configuration
+    GOOGLE_WEB_CLIENT_ID: str
+    GOOGLE_ANDROID_CLIENT_ID: str
 
     def __init__(self):
         self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
         self.DATABASE_URL = os.getenv("DATABASE_URL", "")
+        
+        self.SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_for_dev_only_change_in_production")
+        self.GOOGLE_WEB_CLIENT_ID = os.getenv("GOOGLE_WEB_CLIENT_ID", "")
+        self.GOOGLE_ANDROID_CLIENT_ID = os.getenv("GOOGLE_ANDROID_CLIENT_ID", "")
 
         # Configuration Assertions & Validations
         if not self.GEMINI_API_KEY:

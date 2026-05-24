@@ -34,6 +34,12 @@ class Statement(Base):
         nullable=False,
     )
 
+    user_id = Column(
+        GUID,
+        ForeignKey("users.user_id"),
+        nullable=True,  # Temporarily nullable for migration/legacy data
+    )
+
 
 class StatementThesisChunk(Base):
     __tablename__ = "statement_thesis_chunks"

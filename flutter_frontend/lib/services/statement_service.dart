@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../models/statement_model.dart';
 import '../models/insights_model.dart';
 import '../models/visualization_model.dart';
+import 'auth_service.dart';
 
 class StatementService {
   // Configures local device bridge address transparently
@@ -13,6 +14,14 @@ class StatementService {
       return 'http://10.149.147.205:8000/api/statements';
     }
     return 'http://127.0.0.1:8000/api/statements';
+  }
+
+  static Future<Map<String, String>> _getHeaders() async {
+    final token = await AuthService.getToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
   }
 
   /// Optimized Batch Translation using HTML Packing
@@ -41,7 +50,7 @@ class StatementService {
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: await _getHeaders(),
         body: jsonEncode({
           'html_content': htmlBuffer.toString(),
           'target_lang': targetLang,
@@ -89,6 +98,12 @@ class StatementService {
   }) async {
     final uri = Uri.parse('$baseUrl/extract');
     final request = http.MultipartRequest('POST', uri);
+    
+    // Add Authorization header
+    final token = await AuthService.getToken();
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
 
     request.files.add(
       http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
@@ -116,7 +131,7 @@ class StatementService {
 
   static Future<List<StatementMetadata>> listStatements() async {
     final response = await http
-        .get(Uri.parse(baseUrl))
+        .get(Uri.parse(baseUrl), headers: await _getHeaders())
         .timeout(const Duration(seconds: 30));
     if (response.statusCode == 200) {
       final jsonData = jsonDecode(response.body) as List;
@@ -125,11 +140,22 @@ class StatementService {
     throw Exception('Failed to list statements: ${response.body}');
   }
 
+  static Future<StatementResponse> getStatement(
+    String statementId,
+  ) async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/$statementId'), headers: await _getHeaders())
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 200)
+      return StatementResponse.fromJson(jsonDecode(response.body));
+    throw Exception('Failed to fetch statement: ${response.body}');
+  }
+
   static Future<StatementInsights> getStatementInsights(
     String statementId,
   ) async {
     final response = await http
-        .get(Uri.parse('$baseUrl/$statementId/insights'))
+        .get(Uri.parse('$baseUrl/$statementId/insights'), headers: await _getHeaders())
         .timeout(const Duration(seconds: 30));
     if (response.statusCode == 200)
       return StatementInsights.fromJson(jsonDecode(response.body));
@@ -140,7 +166,7 @@ class StatementService {
     String statementId,
   ) async {
     final response = await http
-        .get(Uri.parse('$baseUrl/$statementId/visualization'))
+        .get(Uri.parse('$baseUrl/$statementId/visualization'), headers: await _getHeaders())
         .timeout(const Duration(seconds: 30));
     if (response.statusCode == 200)
       return VisualizationResponse.fromJson(jsonDecode(response.body));
@@ -151,7 +177,7 @@ class StatementService {
     String statementId,
   ) async {
     final response = await http
-        .get(Uri.parse('$baseUrl/$statementId/ai-coach'))
+        .get(Uri.parse('$baseUrl/$statementId/ai-coach'), headers: await _getHeaders())
         .timeout(const Duration(seconds: 30));
     if (response.statusCode == 200)
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -166,7 +192,7 @@ class StatementService {
     final response = await http
         .post(
           Uri.parse('$baseUrl/$statementId/chat'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await _getHeaders(),
           body: jsonEncode({
             'message': message,
             'chat_history': chatHistory

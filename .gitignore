@@ -21,6 +21,7 @@ flutter_frontend/ios/Pods/
 flutter_frontend/ios/Flutter/Flutter.podspec
 flutter_frontend/ios/Flutter/GeneratedPluginRegistrant.h
 flutter_frontend/ios/Flutter/GeneratedPluginRegistrant.m
+flutter_frontend/assets/.env
 flutter_frontend/build/
 
 # === System & IDEs ===
