@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/statement_model.dart';
 import '../models/insights_model.dart';
-import '../models/visualization_model.dart'; // Ensure your visualization response models are located here
+import '../models/visualization_model.dart';
 
 class StatementService {
-  // Configures local device bridge address transparently when deployed to Android Emulators
+  // Configures local device bridge address transparently
   static String get baseUrl {
     if (defaultTargetPlatform == TargetPlatform.android && !kIsWeb) {
       return 'http://10.149.147.205:8000/api/statements';
@@ -15,11 +15,77 @@ class StatementService {
     return 'http://127.0.0.1:8000/api/statements';
   }
 
-  /// POST /api/statements/extract
+  /// Optimized Batch Translation using HTML Packing
+  /// Sends a list of strings wrapped in HTML to the backend for single-trip processing.
+  static Future<List<String>> translatePackedList({
+    required List<String> items,
+    required String targetLang,
+  }) async {
+    if (items.isEmpty) return [];
+
+    // 1. PACKING STAGE: Wrap individual elements inside unique tracking tags
+    final htmlBuffer = StringBuffer();
+    for (int i = 0; i < items.length; i++) {
+      String cleanText = items[i]
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;');
+      htmlBuffer.write('<p id="$i">$cleanText</p>');
+    }
+
+    // Direct path to the /translate/html endpoint (removing the /statements prefix)
+    final url = Uri.parse(
+      baseUrl.replaceAll('/api/statements', '/api/translate/html'),
+    );
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'html_content': htmlBuffer.toString(),
+          'target_lang': targetLang,
+          'source_lang': 'auto',
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        String translatedHtml = data['translated_html'] ?? '';
+
+        // 2. UNPACKING STAGE: Reconstruct the collection using Regex
+        final exp = RegExp(
+          r'<p id="\d+">(.*?)</p>',
+          caseSensitive: false,
+          dotAll: true,
+        );
+        final matches = exp.allMatches(translatedHtml);
+
+        List<String> results = [];
+        for (final match in matches) {
+          String decodedValue = match.group(1) ?? '';
+          decodedValue = decodedValue
+              .replaceAll('&amp;', '&')
+              .replaceAll('&lt;', '<')
+              .replaceAll('&gt;', '>');
+          results.add(decodedValue.trim());
+        }
+
+        return results.length == items.length ? results : items;
+      } else {
+        throw Exception(
+          'Server rejected packed payload: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('HTML packing pipeline error: $e');
+    }
+  }
+
   static Future<StatementResponse> uploadStatement(
     String fileName,
     Uint8List fileBytes, {
-    String? password, // <-- Add optional named parameter
+    String? password,
   }) async {
     final uri = Uri.parse('$baseUrl/extract');
     final request = http.MultipartRequest('POST', uri);
@@ -28,7 +94,6 @@ class StatementService {
       http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
     );
 
-    // Attach password payload to fields if provided
     if (password != null && password.isNotEmpty) {
       request.fields['password'] = password;
     }
@@ -36,124 +101,89 @@ class StatementService {
     final streamedResponse = await request.send().timeout(
       const Duration(seconds: 120),
     );
-
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 200) {
-      final jsonData = jsonDecode(response.body);
-      return StatementResponse.fromJson(jsonData);
+      return StatementResponse.fromJson(jsonDecode(response.body));
     }
-
-    // Catch password status signals from the backend
     if (response.statusCode == 401) {
-      final errorDetail = jsonDecode(response.body)['detail'];
-      throw FormatException(errorDetail ?? 'PASSWORD_ERROR');
+      throw FormatException(
+        jsonDecode(response.body)['detail'] ?? 'PASSWORD_ERROR',
+      );
     }
-
     throw Exception('Upload failed: ${response.body}');
   }
 
-  /// GET /api/statements
-  /// Retrieves and lists all parsed bank statements with their structural database IDs
   static Future<List<StatementMetadata>> listStatements() async {
-    final uri = Uri.parse(baseUrl);
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
-
+    final response = await http
+        .get(Uri.parse(baseUrl))
+        .timeout(const Duration(seconds: 30));
     if (response.statusCode == 200) {
       final jsonData = jsonDecode(response.body) as List;
       return jsonData.map((item) => StatementMetadata.fromJson(item)).toList();
     }
-
     throw Exception('Failed to list statements: ${response.body}');
   }
 
-  /// GET /api/statements/{statement_id}/insights
-  /// Pulls dynamic aggregates, category spending item breakdowns, and subscription checks
   static Future<StatementInsights> getStatementInsights(
     String statementId,
   ) async {
-    final uri = Uri.parse('$baseUrl/$statementId/insights');
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
-
-    if (response.statusCode == 200) {
-      final jsonData = jsonDecode(response.body);
-      return StatementInsights.fromJson(jsonData);
-    }
-
+    final response = await http
+        .get(Uri.parse('$baseUrl/$statementId/insights'))
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 200)
+      return StatementInsights.fromJson(jsonDecode(response.body));
     throw Exception('Failed to fetch insights: ${response.body}');
   }
 
-  /// GET /api/statements/{statement_id}/visualization
-  /// Compiles premium health scores, timeline time-series data points, and budget frameworks
   static Future<VisualizationResponse> getStatementVisualization(
     String statementId,
   ) async {
-    final uri = Uri.parse('$baseUrl/$statementId/visualization');
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
-
-    if (response.statusCode == 200) {
-      final jsonData = jsonDecode(response.body);
-      return VisualizationResponse.fromJson(jsonData);
-    }
-
-    throw Exception('Failed to fetch visualization data: ${response.body}');
+    final response = await http
+        .get(Uri.parse('$baseUrl/$statementId/visualization'))
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 200)
+      return VisualizationResponse.fromJson(jsonDecode(response.body));
+    throw Exception('Failed to fetch visualization: ${response.body}');
   }
 
-  /// GET /api/statements/{statement_id}/ai-coach
-  /// Fetches ONLY the AI-powered textual summary evaluation and structured prioritized recommendations
   static Future<Map<String, dynamic>> getStatementAICoach(
     String statementId,
   ) async {
-    final uri = Uri.parse('$baseUrl/$statementId/ai-coach');
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
-
-    if (response.statusCode == 200) {
+    final response = await http
+        .get(Uri.parse('$baseUrl/$statementId/ai-coach'))
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 200)
       return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-
-    throw Exception('AI Coach pipeline failure: ${response.body}');
+    throw Exception('AI Coach failure: ${response.body}');
   }
 
-  /// POST /api/statements/{statement_id}/chat
-  /// RAG-based interactive chat utility matching indexed transaction narration vectors
   static Future<String> chatWithStatement({
     required String statementId,
     required String message,
-    required List<Map<String, String>>
-    chatHistory, // Changed from List<String> to accept structured rows
+    required List<Map<String, String>> chatHistory,
   }) async {
-    final uri = Uri.parse('$baseUrl/$statementId/chat');
-
-    // Map the internal frontend message objects into the JSON key structure expected by the backend
-    final formattedHistory = chatHistory
-        .map(
-          (m) => {
-            'role': m['sender'] == 'user'
-                ? 'user'
-                : 'assistant', // Map role to standard LLM schemas (user/assistant)
-            'content': m['text'] ?? '',
-          },
-        )
-        .toList();
-
     final response = await http
         .post(
-          uri,
+          Uri.parse('$baseUrl/$statementId/chat'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'message': message,
-            'chat_history':
-                formattedHistory, // Passing structured dictionaries satisfying Pydantic validation
+            'chat_history': chatHistory
+                .map(
+                  (m) => {
+                    'role': m['sender'] == 'user' ? 'user' : 'assistant',
+                    'content': m['text'] ?? '',
+                  },
+                )
+                .toList(),
           }),
         )
         .timeout(const Duration(seconds: 45));
 
-    if (response.statusCode == 200) {
-      final jsonData = jsonDecode(response.body);
-      return jsonData['response'] ?? '';
-    }
-
-    throw Exception('Semantic document query agent fault: ${response.body}');
+    if (response.statusCode == 200)
+      return jsonDecode(response.body)['response'] ?? '';
+    throw Exception('Chat agent fault: ${response.body}');
   }
 }
 

@@ -23,24 +23,69 @@ class TransactionsScreen extends StatefulWidget {
 class _TransactionsScreenState extends State<TransactionsScreen> {
   bool isLoadingInsights = false;
 
-  Color getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-        return const Color(0xFFE65100); // Rich safety orange
-      case 'shopping':
-        return const Color(0xFF6A1B9A); // Royal amethyst purple
-      case 'travel':
-        return const Color(0xFF1565C0); // Tech cobalt blue
-      case 'income':
-        return AppColors.primaryGreen; // Financial emerald green
-      default:
-        return AppColors.secondaryTeal; // Corporate steel teal
+  // Translation State
+  List<String> translatedDescriptions = [];
+  bool isTranslated = false;
+  bool isTranslating = false;
+
+  void _toggleLanguage() async {
+    if (isTranslated) {
+      setState(() => isTranslated = false);
+      return;
+    }
+
+    setState(() => isTranslating = true);
+
+    try {
+      // Collect descriptions for batch translation
+      List<String> descriptions = widget.transactions
+          .map((t) => t.narration)
+          .toList();
+
+      // Call batch translation (Hardcoded 'hi' for Hindi, change to dynamic as needed)
+      List<String> translated = await StatementService.translatePackedList(
+        items: descriptions,
+        targetLang: 'hi',
+      );
+
+      setState(() {
+        translatedDescriptions = translated;
+        isTranslated = true;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Translation failed: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => isTranslating = false);
     }
   }
 
-  Widget buildTransactionCard(Transaction txn) {
+  Color getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+        return const Color(0xFFE65100);
+      case 'shopping':
+        return const Color(0xFF6A1B9A);
+      case 'travel':
+        return const Color(0xFF1565C0);
+      case 'income':
+        return AppColors.primaryGreen;
+      default:
+        return AppColors.secondaryTeal;
+    }
+  }
+
+  Widget buildTransactionCard(Transaction txn, int index) {
     final category = txn.category ?? 'Others';
     final indicatorColor = getCategoryColor(category);
+    // Display translated text if available, otherwise original
+    final String displayText =
+        isTranslated && translatedDescriptions.length > index
+        ? translatedDescriptions[index]
+        : txn.narration;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -49,17 +94,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Row(
         children: [
-          // Left accent indicator line
           Container(
             width: 4,
             height: 38,
@@ -69,14 +106,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          // Narrative details block
           Expanded(
             flex: 6,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  txn.narration,
+                  displayText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -86,13 +122,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   ),
                 ),
                 const SizedBox(height: 5),
-                // FIXED: Changed from Row to Wrap to enforce side-by-side alignment on both Web & Android
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing:
-                      6, // Adds uniform space between elements horizontally
-                  runSpacing:
-                      4, // Handles elegant multi-line wrapping safely if text gets too long
+                  spacing: 6,
                   children: [
                     Text(
                       category,
@@ -122,19 +154,15 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          // Financial values summary block
           Expanded(
             flex: 4,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   txn.debit > 0
                       ? '- ₹${txn.debit.toStringAsFixed(0)}'
                       : '+ ₹${txn.credit.toStringAsFixed(0)}',
-                  textAlign: TextAlign.right,
                   style: TextStyle(
                     color: txn.debit > 0
                         ? const Color(0xFFD32F2F)
@@ -143,10 +171,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     fontSize: 15,
                   ),
                 ),
-                const SizedBox(height: 4),
                 Text(
                   'Bal: ₹${txn.balance.toStringAsFixed(0)}',
-                  textAlign: TextAlign.right,
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 11,
@@ -163,7 +189,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   void _loadInsights() async {
     if (widget.statementId == null) return;
     setState(() => isLoadingInsights = true);
-
     try {
       final insights = await StatementService.getStatementInsights(
         widget.statementId!,
@@ -182,11 +207,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     } finally {
       if (mounted) setState(() => isLoadingInsights = false);
     }
@@ -194,37 +218,35 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 800;
-
     return Scaffold(
       backgroundColor: AppColors.bgLight,
       appBar: AppBar(
         backgroundColor: AppColors.surfaceLight,
         elevation: 0,
-        scrolledUnderElevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         title: const Text(
           'Transactions',
           style: TextStyle(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
           ),
         ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: AppColors.borderLight),
-        ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              isTranslated
+                  ? Icons.g_translate_rounded
+                  : Icons.translate_rounded,
+              color: AppColors.primaryGreen,
+            ),
+            onPressed: isTranslating ? null : _toggleLanguage,
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 12 : 28,
-              vertical: 24,
-            ),
+            padding: const EdgeInsets.all(24),
             child: Column(
               children: [
                 Row(
@@ -232,61 +254,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   children: [
                     Text(
                       '${widget.transactions.length} Transactions',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: isLoadingInsights ? null : _loadInsights,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Ink(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                AppColors.primaryGreen,
-                                AppColors.secondaryTeal,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: isLoadingInsights
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.insights_rounded,
-                                      size: 18,
-                                      color: Colors.white,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Insights',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
+                    ElevatedButton.icon(
+                      onPressed: isLoadingInsights ? null : _loadInsights,
+                      icon: const Icon(Icons.insights_rounded),
+                      label: const Text('Insights'),
                     ),
                   ],
                 ),
@@ -295,7 +268,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   child: ListView.builder(
                     itemCount: widget.transactions.length,
                     itemBuilder: (context, index) =>
-                        buildTransactionCard(widget.transactions[index]),
+                        buildTransactionCard(widget.transactions[index], index),
                   ),
                 ),
               ],
